@@ -1,0 +1,63 @@
+pharmacy-management-system/
+│
+├── ai_modules/                 # وحدات الذكاء الاصطناعي الخاصة بالنظام
+├── database/                   # إعدادات وقاعدة البيانات والـ Session
+│   └── session.py
+├── datasets/                   # البيانات أو المجموعات الإحصائية المستخدمة
+├── frontend/                   # واجهات المستخدم (الخاصة بالتطبيق أو الويب)
+├── models/                     # جداول قاعدة البيانات (ORM Models)
+│   └── all_models.py
+│
+├── modules/                    # الوحدات البرمجية الأساسية للنظام (Modular Core)
+│   ├── audit_logs/             # سجلات المراجعة والتدقيق
+│   │   └── controller/ audit_log_controller.py
+│   ├── auth/                   # الصلاحيات وتوثيق المستخدمين (الدخول والخروج)
+│   │   ├── controller/ auth_controller.py
+│   │   ├── decorators/         # الموجهات المخصصة للصلاحيات والتحقق
+│   │   └── utils/              # أدوات مساعدة للتشفير والتوثيق
+│   ├── categories/             # تصنيفات الأدوية
+│   │   └── controller/ category_controller.py
+│   ├── customers/              # إدارة بيانات العملاء
+│   │   └── controller/ customer_controller.py
+│   ├── expired_medicines/      # إدارة الأدوية منتهية الصلاحية
+│   │   └── controller/ expired_medicine_controller.py, expired_medicine_item_controller.py
+│   ├── inventory/              # إدارة المخزون والمستودع
+│   │   ├── controller/ inventory_controller.py
+│   │   └── repository/ inventory_repository.py
+│   ├── manufacturers/          # الشركات المصنعة للأدوية
+│   │   └── controller/ manufacturer_controller.py
+│   ├── medicines/              # الأدوية والطبخات/التشغيلات البرمجية لها
+│   │   └── controller/ medicine_batch_controller.py, medicine_controller.py
+│   ├── notifications/          # نظام التنبيهات (مثل اقتراب انتهاء الصلاحية أو نقص المخزون)
+│   │   └── controller/ notification_controller.py
+│   ├── prescriptions/          # الروشتات والوصفات الطبية
+│   │   └── controller/ prescription_controller.py, prescription_item_controller.py
+│   ├── purchase_returns/       # مرتجعات المشتريات
+│   │   └── controller/ purchase_return_controller.py, purchase_return_item_controller.py
+│   ├── purchases/              # عمليات الشراء وطلبيات الموردين
+│   │   └── controller/ purchase_item_controller.py, purchase_order_controller.py
+│   ├── reports/                # التقارير والإحصائيات الخاصة بالصيدلية
+│   │   └── controller/ report_controller.py
+│   ├── roles/                  # أدوار المستخدمين وصلاحياتهم (مدير، صيدلي، كاشير)
+│   │   └── controller/ role_controller.py
+│   ├── sales/                  # المبيعات والفواتير
+│   │   └── controller/ sale_item_controller.py, sale_invoice_controller.py
+│   ├── sales_returns/          # مرتجعات المبيعات من الزبائن
+│   │   └── controller/ sales_return_controller.py, sales_return_item_controller.py
+│   ├── stock_movements/        # حركة المخزون والتحويلات الداخلية
+│   │   └── controllers/ stock_movement_controller.py
+│   ├── suppliers/              # الموردين وشركات التوزيع
+│   │   └── controllers/ supplier_controller.py
+│   └── users/                  # إدارة حسابات المستخدمين (الموظفين)
+│       └── controller/ user_controller.py
+│
+# ملاحظة: تحتوي كافة المجلدات الفرعية داخل المجلدات أعلاه على طبقات (repository, schemas, services) لتسيير البيانات والعمليات.
+│
+├── main.py                     # نقطة تشغيل التطبيق الأساسية
+├── create_database.py          # سكربت لإنشاء جداول قاعدة البيانات وتجهيزها
+├── seed_data.py                # سكربت لتغذية قاعدة البيانات ببيانات أولية تجريبية
+├── import_interactions.py       # سكربت لاستيراد التداخلات الدوائية أو البيانات الخارجية
+├── requirements.txt            # المكتبات والاعتماديات المطلوبة للمشروع
+├── temp.py                     # ملف مؤقت للتجارب والاختبارات السريعة
+├── test.py                     # ملف يحتوي على اختبارات برمجية (Unit Tests)
+└── pharmacy.db                 # ملف قاعدة البيانات المحلي (SQLite)
