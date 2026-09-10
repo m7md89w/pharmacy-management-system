@@ -367,21 +367,22 @@ class SalesReturnService:
             # ==========================================
             # UPDATE BATCH
             # ==========================================
-            batch = self.batch_repo.get_by_id(
-                item.batch_id
-            )
-
+            batch = self.batch_repo.get_by_id(item.batch_id)
             if not batch:
                 raise ValueError(
                     f"Batch {item.batch_id} not found"
-                )
-
+                    )
+                
+            print("================================")
+            print("Return Item Batch:", item.batch_id)
+            print("Batch Qty Before :", batch.quantity)
+            print("Return Qty      :", item.quantity)
             batch.quantity += item.quantity
-
-            self.batch_repo.update(
-                batch
-            )
-
+            print("Batch Qty After  :", batch.quantity)
+            self.batch_repo.update(batch)
+            saved_batch = self.batch_repo.get_by_id(batch.batch_id)
+            print("Saved Qty        :", saved_batch.quantity)
+            print("================================")
             # ==========================================
             # UPDATE INVENTORY
             # ==========================================
@@ -455,6 +456,7 @@ class SalesReturnService:
         sales_return.status = "COMPLETED"
 
         self.audit_repo.create({
+            
 
             "user_id":
                 sales_return.user_id,
@@ -523,3 +525,109 @@ class SalesReturnService:
         )
 
         return True
+
+    # ==========================================
+    # CANCEL RETURN
+    # ==========================================
+    def cancel_return(
+        self,
+        sales_return_or_id
+    ):
+        # دعم استقبال كائن أو رقم الـ ID مباشرة لمرونة الـ Controller
+        if isinstance(sales_return_or_id, int):
+            sales_return = self.return_repo.get_by_id(sales_return_or_id)
+            if not sales_return:
+                raise ValueError("Sales return not found")
+        else:
+            sales_return = sales_return_or_id
+
+        # التحقق من عدم التكرار (Idempotency) - إذا كان ملغى مسبقاً
+        if sales_return.status == "CANCELLED":
+            return sales_return
+
+        if sales_return.status not in ["COMPLETED", "DRAFT"]:
+            raise ValueError(
+                "Only completed or draft returns can be cancelled"
+            )
+
+        # إذا كان الطلب في حالة DRAFT، يتم إلغاؤه مباشرة دون عكس المخزون
+        if sales_return.status == "DRAFT":
+            sales_return.status = "CANCELLED"
+            self.return_repo.update(sales_return)
+            
+            self.audit_repo.create({
+                "user_id": sales_return.user_id,
+                "action": "CANCEL_SALES_RETURN_DRAFT",
+                "table_name": "sales_returns",
+                "record_id": sales_return.return_id,
+                "details": f"Draft sales return #{sales_return.return_id} cancelled"
+            })
+            return sales_return
+
+        # إذا كان الطلب COMPLETED، يجب عكس تأثير المخزون (Transaction Reversal)
+        items = self.item_repo.get_by_return(
+            sales_return.return_id
+        )
+
+        total_cancel_amount = Decimal("0")
+
+        for item in items:
+            batch = self.batch_repo.get_by_id(item.batch_id)
+            if not batch:
+                raise ValueError(f"Batch {item.batch_id} not found")
+
+            inventory = self.inventory_repo.get_by_medicine(item.medicine_id)
+            if not inventory:
+                raise ValueError(f"Inventory for medicine {item.medicine_id} not found")
+
+            # التحقق من عدم نزول الكمية للسالب قبل العكس (Non-Negative Stock)
+            if batch.quantity < item.quantity:
+                raise ValueError(
+                    f"Insufficient batch quantity to cancel return. "
+                    f"Current: {batch.quantity}, Required to reverse: {item.quantity}"
+                )
+
+            # عكس كمية الدفعة (-Q)
+            batch.quantity -= item.quantity
+            self.batch_repo.update(batch)
+
+            # عكس كمية المخزون العام (-Q)
+            inventory.quantity -= item.quantity
+            self.inventory_repo.update(inventory)
+
+            # تسجيل حركة المخزون المعاكسة باستخدام نوع الحركة المعتمد "RETURN" لتجنب قيود قاعدة البيانات
+            self.movement_repo.create({
+                "batch_id": batch.batch_id,
+                "movement_type": "RETURN",
+                "quantity_change": -item.quantity,
+                "reference_type": "RETURN",
+                "reference_id": sales_return.return_id,
+                "notes": f"Cancelled Sales Return #{sales_return.return_id}",
+                "created_by": sales_return.user_id
+            })
+
+            total_cancel_amount += Decimal(str(item.subtotal))
+
+        # إعادة تعديل إجمالي الفاتورة الأساسية
+        invoice = self.invoice_repo.get_by_id(sales_return.invoice_id)
+        if invoice:
+            invoice.total_amount = (
+                Decimal(str(invoice.total_amount))
+                + total_cancel_amount
+            )
+            self.invoice_repo.update(invoice)
+
+        # تحديث حالة المرتجع إلى CANCELLED
+        sales_return.status = "CANCELLED"
+        self.return_repo.update(sales_return)
+
+        # تسجيل الحدث في الـ Audit Log
+        self.audit_repo.create({
+            "user_id": sales_return.user_id,
+            "action": "CANCEL_SALES_RETURN",
+            "table_name": "sales_returns",
+            "record_id": sales_return.return_id,
+            "details": f"Sales return #{sales_return.return_id} cancelled successfully"
+        })
+
+        return sales_return

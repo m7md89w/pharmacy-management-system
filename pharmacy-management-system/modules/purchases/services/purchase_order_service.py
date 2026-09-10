@@ -71,8 +71,7 @@ class PurchaseOrderService:
             "action": "CREATE_PURCHASE",
             "table_name": "purchase_orders",
             "record_id": order.purchase_id,
-            "details":
-                f"Purchase Order #{order.purchase_id} created"
+            "details": f"Purchase Order #{order.purchase_id} created"
         })
 
         return order
@@ -101,9 +100,8 @@ class PurchaseOrderService:
     ):
 
         return self.order_repo.get_all()
-    
 
-        # ==================================================
+    # ==================================================
     # UPDATE
     # ==================================================
     def update_order(
@@ -148,6 +146,11 @@ class PurchaseOrderService:
                         "Purchase order has no items"
                     )
 
+                # استخراج مواقع التخزين المدخلة من بيانات الطلب
+                # يمكن تمرير location كموقع موحد، أو locations كقاموس {medicine_id: location}
+                default_location = data.get("location")
+                locations_map = data.get("locations", {})
+
                 for item in items:
 
                     if item.batch_id:
@@ -185,6 +188,15 @@ class PurchaseOrderService:
                         "expiry_date": item.expiry_date
                     })
 
+                    # تحديد موقع التخزين لهذا الدواء بالتحديد
+                    assigned_location = (
+                        locations_map.get(str(item.medicine_id))
+                        or locations_map.get(item.medicine_id)
+                        or default_location
+                    )
+                    if assigned_location is not None:
+                        assigned_location = str(assigned_location).strip()
+
                     # ==========================================
                     # UPDATE INVENTORY
                     # ==========================================
@@ -193,20 +205,19 @@ class PurchaseOrderService:
                     )
 
                     if inventory:
-
                         inventory.quantity += item.quantity
+                        if assigned_location:
+                            inventory.location = assigned_location
 
                         self.inventory_repo.update(
                             inventory
                         )
-
                     else:
-
                         self.inventory_repo.create({
                             "medicine_id": item.medicine_id,
                             "quantity": item.quantity,
                             "min_stock_level": 0,
-                            "location": None
+                            "location": assigned_location if assigned_location else None
                         })
 
                     # ==========================================
@@ -259,8 +270,8 @@ class PurchaseOrderService:
         return self.order_repo.update(
             order
         )
-    
-        # ==================================================
+
+    # ==================================================
     # DELETE
     # ==================================================
     def delete_order(
@@ -278,8 +289,7 @@ class PurchaseOrderService:
             "action": "DELETE_PURCHASE",
             "table_name": "purchase_orders",
             "record_id": order.purchase_id,
-            "details":
-                f"Purchase Order #{order.purchase_id} deleted"
+            "details": f"Purchase Order #{order.purchase_id} deleted"
         })
 
         return self.order_repo.delete(
@@ -323,5 +333,3 @@ class PurchaseOrderService:
         return self.order_repo.get_by_status(
             status
         )
-    
-

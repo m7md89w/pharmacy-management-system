@@ -134,3 +134,41 @@ def get_items(
 
     finally:
         db.close()
+
+
+@prescription_item_controller.route(
+    "/<int:item_id>",
+    methods=["DELETE"]
+)
+@auth_required
+@role_required([1, 2, 3])
+def delete_item(item_id):
+
+    db = SessionLocal()
+
+    try:
+
+        item_repo = PrescriptionItemRepository(db)
+        prescription_repo = PrescriptionRepository(db)
+        medicine_repo = MedicineRepository(db)
+
+        service = PrescriptionItemService(
+            item_repo,
+            prescription_repo,
+            medicine_repo
+        )
+
+        item = service.get_item(item_id)
+        service.delete_item(item)
+
+        return jsonify({
+            "message": "Prescription item deleted successfully"
+        }), 200
+
+    except ValueError as e:
+        return jsonify({
+            "error": str(e)
+        }), 404
+
+    finally:
+        db.close()

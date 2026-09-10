@@ -1,15 +1,31 @@
+import os
 import jwt
 
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
+# ==================================================
+# CONFIGURATION
+# ==================================================
 
-SECRET_KEY = "4b00d21aed0caedeaf0845d1d34bebc2695f0c20a15675d7c4fef8d44a2e622f"
-ALGORITHM = "HS256"
+SECRET_KEY: str = os.environ.get("JWT_SECRET_KEY", "")
+ALGORITHM: str = "HS256"
+TOKEN_EXPIRE_HOURS: int = int(os.environ.get("JWT_EXPIRE_HOURS", "24"))
 
-TOKEN_EXPIRE_HOURS = 24
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY environment variable is not set. "
+        "Copy .env.example to .env and set a strong secret key."
+    )
 
+
+# ==================================================
+# JWT HANDLER
+# ==================================================
 
 class JWTHandler:
 
@@ -18,35 +34,24 @@ class JWTHandler:
         user_id: int,
         username: str,
         role_id: int
-    ):
-
+    ) -> str:
+        """
+        Creates a signed JWT access token.
+        Uses timezone-aware UTC to avoid deprecation warnings in Python 3.12+.
+        """
         payload = {
             "user_id": user_id,
             "username": username,
             "role_id": role_id,
-            "exp": datetime.utcnow()
-            + timedelta(
-                hours=TOKEN_EXPIRE_HOURS
-            )
+            "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS),
         }
 
-        token = jwt.encode(
-            payload,
-            SECRET_KEY,
-            algorithm=ALGORITHM
-        )
-
-        return token
+        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     @staticmethod
-    def verify_token(
-        token: str
-    ):
-
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM]
-        )
-
-        return payload
+    def verify_token(token: str) -> dict:
+        """
+        Decodes and validates a JWT token.
+        Raises jwt.ExpiredSignatureError or jwt.InvalidTokenError on failure.
+        """
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

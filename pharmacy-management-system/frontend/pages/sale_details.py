@@ -6,20 +6,44 @@ from services.api_client import (
     put,
     delete
 )
+from components.sidebar import render_sidebar
 
 st.set_page_config(
     page_title="Sale Details",
     page_icon="💰",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("💰 Sale Details")
 
 # ==================================================
 # AUTH
 # ==================================================
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
     st.warning("Please login first.")
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if (
@@ -36,7 +60,7 @@ invoice_id = st.session_state.selected_invoice
 # ==================================================
 response = get(
     f"/sales-invoices/{invoice_id}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -50,7 +74,7 @@ invoice = response.json()
 # ==================================================
 response = get(
     "/customers/",
-    st.session_state.token
+    token=token
 )
 
 customer_map = {}
@@ -69,7 +93,7 @@ if response.status_code == 200:
 # ==================================================
 response = get(
     "/medicines/",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -93,7 +117,7 @@ medicine_options = {
 # ==================================================
 response = get(
     f"/sale-items/invoice/{invoice_id}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -112,7 +136,7 @@ items = response.json()
 # ==================================================
 response = get(
     f"/sales-returns/invoice/{invoice_id}",
-    st.session_state.token
+    token=token
 )
 
 sales_returns = []
@@ -126,7 +150,7 @@ if response.status_code == 200:
 # ==================================================
 response = get(
     f"/sales-return-items/invoice/{invoice_id}",
-    st.session_state.token
+    token=token
 )
 
 returned_items = []
@@ -233,7 +257,7 @@ if invoice["status"] == "DRAFT":
             response = post(
                 f"/sales-invoices/{invoice_id}/complete",
                 {},
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 200:
@@ -248,7 +272,7 @@ if invoice["status"] == "DRAFT":
 
                 try:
                     error = response.json()["error"]
-                except:
+                except Exception:
                     error = response.text
 
                 st.error(error)
@@ -279,7 +303,7 @@ if invoice["status"] == "DRAFT":
     # ==========================================
     response = get(
         f"/batches/medicine/{selected_medicine_id}",
-        st.session_state.token
+        token=token
     )
 
     available_batches = []
@@ -351,7 +375,7 @@ if invoice["status"] == "DRAFT":
                     "medicine_id": selected_medicine_id,
                     "quantity": int(quantity)
                 },
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 201:
@@ -368,7 +392,7 @@ if invoice["status"] == "DRAFT":
                     st.error(
                         response.json()["error"]
                     )
-                except:
+                except Exception:
 
                     st.error(
                         response.text
@@ -500,7 +524,7 @@ else:
 
                     response = delete(
                         f"/sale-items/{item['sale_item_id']}",
-                        st.session_state.token
+                        token=token
                     )
 
                     if response.status_code == 200:
@@ -519,7 +543,7 @@ else:
                                 response.json()["error"]
                             )
 
-                        except:
+                        except Exception:
 
                             st.error(
                                 response.text
@@ -624,7 +648,7 @@ if invoice["status"] == "COMPLETED":
 
                 },
 
-                st.session_state.token
+                token=token
 
             )
 
@@ -644,7 +668,7 @@ if invoice["status"] == "COMPLETED":
                         response.json()["error"]
                     )
 
-                except:
+                except Exception:
 
                     st.error(
                         response.text
@@ -670,7 +694,7 @@ else:
 
         with st.expander(
 
-            f"Return #{sale_return['return_number']}"
+            f"Return #{sale_return['return_id']}"
 
         ):
 
@@ -692,7 +716,7 @@ else:
 
             response = get(
                 f"/sales-return-items/return/{sale_return['return_id']}",
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 200:
@@ -803,7 +827,7 @@ if invoice["status"] == "DRAFT":
 
         response = delete(
             f"/sales-invoices/{invoice_id}",
-            st.session_state.token
+            token=token
         )
 
         if response.status_code == 200:
@@ -825,7 +849,7 @@ if invoice["status"] == "DRAFT":
                     response.json()["error"]
                 )
 
-            except:
+            except Exception:
 
                 st.error(
                     response.text

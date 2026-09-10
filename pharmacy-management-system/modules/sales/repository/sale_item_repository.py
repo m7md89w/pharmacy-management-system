@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from models.all_models import (
     SaleItem,
-    SalesInvoice
+    SalesInvoice,
+    SalesReturn,
+    SalesReturnItem
 )
 
 
@@ -75,14 +77,17 @@ class SaleItemRepository:
         )
 
     # ==================================================
-    # TOTAL SOLD BY BATCH
+    # TOTAL SOLD BY BATCH (NET SOLD)
     # ==================================================
     def get_total_sold_by_batch(
         self,
         batch_id: int
     ):
 
-        total = (
+        # ==========================
+        # Total Sold
+        # ==========================
+        total_sold = (
 
             self.db.query(
 
@@ -116,9 +121,50 @@ class SaleItemRepository:
 
             .scalar()
 
-        )
+        ) or 0
 
-        return total or 0
+        # ==========================
+        # Total Returned
+        # ==========================
+        total_returned = (
+
+            self.db.query(
+
+                func.coalesce(
+                    func.sum(
+                        SalesReturnItem.quantity
+                    ),
+                    0
+                )
+
+            )
+
+            .join(
+                SalesReturn,
+                SalesReturn.return_id
+                ==
+                SalesReturnItem.return_id
+            )
+
+            .filter(
+
+                SalesReturnItem.batch_id
+                ==
+                batch_id,
+
+                SalesReturn.status
+                ==
+                "COMPLETED"
+
+            )
+
+            .scalar()
+
+        ) or 0
+
+        net_sold = total_sold - total_returned
+
+        return max(net_sold, 0)
 
     # ==================================================
     # UPDATE

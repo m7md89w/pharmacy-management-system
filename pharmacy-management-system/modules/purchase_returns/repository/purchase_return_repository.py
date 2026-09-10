@@ -177,6 +177,8 @@ class PurchaseReturnRepository:
             .all()
 
         )
+    
+    
 
     # ==================================================
     # GET BY STATUS

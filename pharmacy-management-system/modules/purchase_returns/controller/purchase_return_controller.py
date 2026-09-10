@@ -125,10 +125,10 @@ def create_return():
             )
         )
 
-        purchase_return = service.create_return(
-            data
-        )
+       
 
+        purchase_return = service.create_return(data)
+        
         return jsonify({
 
             "message":
@@ -421,6 +421,115 @@ def delete_return(return_id):
         return jsonify({
             "error": str(e)
         }), 400
+
+    finally:
+        db.close()
+
+
+# ==================================================
+# GET DRAFT BY PURCHASE
+# ==================================================
+@purchase_return_controller.route(
+    "/purchase/<int:purchase_id>/draft",
+    methods=["GET"]
+)
+@auth_required
+def get_draft_return(purchase_id):
+
+    db = SessionLocal()
+
+    try:
+
+        service = build_service(db)
+
+        purchase_return = (
+            service.return_repo.get_draft_by_purchase(
+                purchase_id
+            )
+        )
+
+        if not purchase_return:
+
+            return jsonify(None), 200
+
+        return jsonify({
+
+            "return_id":
+                purchase_return.return_id,
+
+            "purchase_id":
+                purchase_return.purchase_id,
+
+            "status":
+                purchase_return.status,
+
+            "total_amount":
+                float(purchase_return.total_amount),
+
+            "return_date":
+                str(purchase_return.return_date)
+                if purchase_return.return_date
+                else None,
+
+            "notes":
+                purchase_return.notes
+
+        })
+
+    finally:
+        db.close()
+
+# ==================================================
+# GET DRAFT RETURN BY PURCHASE
+# ==================================================
+@purchase_return_controller.route(
+    "/purchase/<int:purchase_id>/draft",
+    methods=["GET"]
+)
+@auth_required
+def get_draft_by_purchase(purchase_id):
+
+    db = SessionLocal()
+
+    try:
+
+        service = build_service(db)
+
+        purchase_return = (
+            service.return_repo.get_draft_by_purchase(
+                purchase_id
+            )
+        )
+
+        if not purchase_return:
+
+            return jsonify(None), 200
+
+        return jsonify({
+
+            "return_id":
+                purchase_return.return_id,
+
+            "purchase_id":
+                purchase_return.purchase_id,
+
+            "status":
+                purchase_return.status,
+
+            "total_amount":
+                float(purchase_return.total_amount),
+
+            "return_date":
+                (
+                    str(purchase_return.return_date)
+                    if purchase_return.return_date
+                    else None
+                ),
+
+            "notes":
+                purchase_return.notes
+
+        })
 
     finally:
         db.close()

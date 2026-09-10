@@ -339,8 +339,6 @@ def complete_return(return_id):
 
     try:
 
-        
-
         service = build_service(db)
 
         sales_return = service.get_return(
@@ -405,6 +403,45 @@ def delete_return(return_id):
 
     except ValueError as e:
 
+        return jsonify({
+            "error": str(e)
+        }), 400
+
+    finally:
+        db.close()
+
+
+# ==================================================
+# CANCEL RETURN (تم التعديل لدعم PUT و POST معاً)
+# ==================================================
+@sales_return_controller.route(
+    "/<int:return_id>/cancel",
+    methods=["PUT", "POST"]
+)
+@auth_required
+@role_required([1, 2, 3])
+def cancel_return(return_id):
+
+    db = SessionLocal()
+
+    try:
+        service = build_service(db)
+
+        sales_return = service.get_return(
+            return_id
+        )
+
+        sales_return = service.cancel_return(
+            sales_return
+        )
+
+        return jsonify({
+            "message": "Sales return cancelled successfully",
+            "return_id": sales_return.return_id,
+            "status": sales_return.status
+        })
+
+    except ValueError as e:
         return jsonify({
             "error": str(e)
         }), 400

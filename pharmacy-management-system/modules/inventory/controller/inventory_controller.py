@@ -70,18 +70,15 @@ def get_inventory():
             medicine_repo
         )
 
-        inventories = service.get_all_inventory()
+        detailed_inventory = service.get_detailed_inventory()
 
-        return jsonify([
-            {
-                "inventory_id": inventory.inventory_id,
-                "medicine_id": inventory.medicine_id,
-                "quantity": inventory.quantity,
-                "min_stock_level": inventory.min_stock_level,
-                "location": inventory.location
-            }
-            for inventory in inventories
-        ])
+        return jsonify(detailed_inventory), 200
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 500
 
     finally:
         db.close()

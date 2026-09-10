@@ -2,14 +2,35 @@ import streamlit as st
 
 from services.api_client import (
     get,
-    post
+    post,
+    delete
 )
+from components.sidebar import render_sidebar
 
 st.set_page_config(
     page_title="Sales Returns",
     page_icon="↩️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("↩️ Sales Returns")
 
@@ -17,8 +38,12 @@ st.title("↩️ Sales Returns")
 # ==================================================
 # AUTH
 # ==================================================
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
     st.warning("Please login first.")
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if "selected_sales_return" not in st.session_state:
@@ -33,7 +58,7 @@ if "selected_return_invoice" not in st.session_state:
 # ==================================================
 response = get(
     "/sales-invoices/status/COMPLETED",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -94,7 +119,7 @@ with st.expander(
             # ==========================================
             response = get(
                 f"/sales-returns/invoice/{invoice_id}/draft",
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 200:
@@ -116,7 +141,7 @@ with st.expander(
                     {
                         "invoice_id": invoice_id
                     },
-                    st.session_state.token
+                    token=token
                 )
 
                 if response.status_code in (
@@ -138,7 +163,7 @@ with st.expander(
 
                     try:
                         error = response.json()["error"]
-                    except:
+                    except Exception:
                         error = response.text
 
                     st.error(error)
@@ -158,7 +183,7 @@ search = st.text_input(
 # ==================================================
 response = get(
     "/sales-returns/invoices",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -222,11 +247,31 @@ if not returned_invoices:
 
 for invoice in returned_invoices:
 
-    col1, col2, col3, col4, col5 = (
+    col1, col2, col3, col4, col5, col6 = (
         st.columns(
-            [2, 3, 2, 2, 1]
+            [2, 2, 2, 2, 1, 1]
         )
     )
+
+    # التحقق مما إذا كان هناك مسودة (Draft) فارغة لهذه الفاتورة
+    draft_response = get(
+        f"/sales-returns/invoice/{invoice['invoice_id']}/draft",
+        token=token
+    )
+    has_empty_draft = False
+    draft_return_id = None
+    if draft_response.status_code == 200:
+        draft_data = draft_response.json()
+        draft_return_id = draft_data.get("return_id")
+        if draft_return_id:
+            items_response = get(
+                f"/sales-return-items/return/{draft_return_id}",
+                token=token
+            )
+            if items_response.status_code == 200:
+                draft_items = items_response.json()
+                if len(draft_items) == 0:
+                    has_empty_draft = True
 
     # ==========================================
     # INVOICE
@@ -261,10 +306,12 @@ for invoice in returned_invoices:
     with col3:
 
         if invoice["returns_count"] == 0:
-
-            st.info(
-                "No Returns"
-            )
+            if has_empty_draft:
+                st.warning("Draft (Empty)")
+            else:
+                st.info(
+                    "No Returns"
+                )
 
         elif invoice["returns_count"] == 1:
 
@@ -297,9 +344,32 @@ for invoice in returned_invoices:
             )
 
     # ==========================================
-    # NEW RETURN
+    # DELETE DRAFT (IF EMPTY)
     # ==========================================
     with col5:
+        if has_empty_draft and draft_return_id:
+            if st.button(
+                "🗑️",
+                key=f"delete_draft_{invoice['invoice_id']}"
+            ):
+                del_response = delete(
+                    f"/sales-returns/{draft_return_id}",
+                    token=token
+                )
+                if del_response.status_code == 200:
+                    st.success("Draft return deleted successfully.")
+                    st.rerun()
+                else:
+                    try:
+                        error = del_response.json()["error"]
+                    except Exception:
+                        error = del_response.text
+                    st.error(error)
+
+    # ==========================================
+    # NEW RETURN / OPEN
+    # ==========================================
+    with col6:
 
         if st.button(
             "➕ New Return",
@@ -311,7 +381,7 @@ for invoice in returned_invoices:
             # --------------------------------------
             response = get(
                 f"/sales-returns/invoice/{invoice['invoice_id']}/draft",
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 200:
@@ -334,7 +404,7 @@ for invoice in returned_invoices:
                         "invoice_id":
                             invoice["invoice_id"]
                     },
-                    st.session_state.token
+                    token=token
                 )
 
                 if response.status_code in (
@@ -356,7 +426,7 @@ for invoice in returned_invoices:
 
                     try:
                         error = response.json()["error"]
-                    except:
+                    except Exception:
                         error = response.text
 
                     st.error(error)

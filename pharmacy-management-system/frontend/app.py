@@ -1,169 +1,128 @@
 import streamlit as st
-from services.api_client import post
 
+# استيراد المكونات ودوال المصادقة
+from services.auth import login_user, is_authenticated
+from components.sidebar import render_sidebar
+
+# ==================================================
+# PAGE CONFIGURATION
+# ==================================================
 st.set_page_config(
     page_title="Pharmacy ERP",
     page_icon="💊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
-
-# ==================================================
-# SESSION
-# ==================================================
-if "token" not in st.session_state:
-    st.session_state.token = None
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-
 
 # ==================================================
 # LOGIN PAGE
 # ==================================================
 def login_page():
+    # إخفاء القائمة الجانبية تماماً في صفحة تسجيل الدخول
+    st.markdown(
+        """
+        <style>
+            [data-testid="collapsedControl"] {
+                display: none;
+            }
+            [data-testid="stSidebar"] {
+                display: none;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-
         st.title("💊 Pharmacy ERP")
-        st.subheader("Login")
+        st.subheader("System Login")
 
-        username = st.text_input(
-            "Username"
-        )
-
-        password = st.text_input(
-            "Password",
-            type="password"
-        )
-
-        if st.button(
-            "Login",
-            use_container_width=True,
-            type="primary"
-        ):
-
-            response = post(
-                "/auth/login",
-                {
-                    "username": username,
-                    "password": password
-                }
+        with st.form(key="login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            
+            submit_btn = st.form_submit_button(
+                "Login",
+                use_container_width=True,
+                type="primary"
             )
 
-            if response.status_code == 200:
+            if submit_btn:
+                if not username or not password:
+                    st.warning("Please enter both username and password.")
+                else:
+                    with st.spinner("Authenticating..."):
+                        success, message = login_user(username, password)
+                        
+                        if success:
+                            # ضمان توحيد تخزين التوكن بالمفتاحين لتجنب أي ضياع للجلسة
+                            token_val = st.session_state.get("token") or st.session_state.get("access_token")
+                            if token_val:
+                                st.session_state["token"] = token_val
+                                st.session_state["access_token"] = token_val
 
-                data = response.json()
-
-                st.session_state.token = (
-                    data["access_token"]
-                )
-
-                st.session_state.user = data
-
-                st.rerun()
-
-            else:
-                st.error(
-                    "Invalid username or password."
-                )
+                            st.success("Login successful! Redirecting...")
+                            st.rerun()
+                        else:
+                            st.error(message)
 
 
 # ==================================================
-# DASHBOARD
+# DASHBOARD PAGE
 # ==================================================
 def dashboard_page():
-
-    user = st.session_state.user
-
-    st.sidebar.title("💊 Pharmacy ERP")
-
-    st.sidebar.success(
-        f"👋 {user['username']}"
+    # إخفاء قائمة التنقل التلقائية لملفات الصفحات في الشريط الجانبي وإبقاء القائمة المخصصة
+    st.markdown(
+        """
+        <style>
+            [data-testid="stSidebarNav"] {
+                display: none !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.sidebar.divider()
+    render_sidebar()
 
-    if st.sidebar.button(
-        "🚪 Logout",
-        use_container_width=True
-    ):
-        st.session_state.token = None
-        st.session_state.user = None
-        st.rerun()
-
-    st.title(
-        "💊 Pharmacy ERP Dashboard"
-    )
-
-    st.write(
-        "Welcome to the Pharmacy Management System"
-    )
+    st.title("💊 Pharmacy ERP Dashboard")
+    st.write("Welcome to the Pharmacy Management System. Please select a module below or from the sidebar.")
 
     st.divider()
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button(
-            "💊 Medicines",
-            use_container_width=True
-        ):
-            st.switch_page(
-                "pages/medicines.py"
-            )
+        if st.button("💊 Medicines", use_container_width=True):
+            st.switch_page("pages/medicines.py")
 
     with col2:
-        if st.button(
-            "🏢 Suppliers",
-            use_container_width=True
-        ):
-            st.switch_page(
-                "pages/suppliers.py"
-            )
+        if st.button("🏢 Suppliers", use_container_width=True):
+            st.switch_page("pages/suppliers.py")
 
     with col3:
-        if st.button(
-            "📦 Inventory",
-            use_container_width=True
-        ):
-            st.switch_page(
-                "pages/inventory.py"
-            )
+        if st.button("📦 Inventory", use_container_width=True):
+            st.switch_page("pages/inventory.py")
 
     col4, col5, col6 = st.columns(3)
 
     with col4:
-        if st.button(
-            "🧾 Purchases",
-            use_container_width=True
-        ):
-            st.switch_page(
-                "pages/purchases.py"
-            )
+        if st.button("🧾 Purchases", use_container_width=True):
+            st.switch_page("pages/purchases.py")
 
     with col5:
-        if st.button(
-            "🛒 Sales",
-            use_container_width=True
-        ):
-            st.switch_page(
-                "pages/sales_invoices.py"
-            )
+        if st.button("🛒 Sales", use_container_width=True):
+            st.switch_page("pages/sales_invoices.py")
 
     with col6:
-        if st.button(
-            "📊 Reports",
-            use_container_width=True
-        ):
-            st.switch_page(
-                "pages/reports.py"
-            )
+        if st.button("📊 Reports", use_container_width=True):
+            st.switch_page("pages/reports.py")
 
     st.divider()
 
-    st.subheader("System Modules")
+    st.subheader("System Modules Status")
 
     st.info(
         """
@@ -172,15 +131,16 @@ def dashboard_page():
         ✅ Inventory Management  
         ✅ Purchases Management  
         ✅ Sales Management  
-        ✅ Reports & Analytics
+        ✅ Reports & Analytics  
+        ✅ System Audit Logs
         """
     )
 
 
 # ==================================================
-# APP
+# MAIN APP ROUTING
 # ==================================================
-if st.session_state.token:
+if is_authenticated():
     dashboard_page()
 else:
     login_page()

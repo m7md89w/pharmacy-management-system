@@ -1,4 +1,3 @@
-
 import streamlit as st
 from services.api_client import (
     get,
@@ -6,11 +5,41 @@ from services.api_client import (
     put,
     delete
 )
+from components.sidebar import render_sidebar
+
+st.set_page_config(
+    page_title="Suppliers",
+    page_icon="🏢",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("🏢 Suppliers")
 
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
     st.warning("Please login first.")
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if "edit_supplier" not in st.session_state:
@@ -47,7 +76,7 @@ with st.expander("➕ Add New Supplier"):
         response = post(
             "/suppliers/",
             data,
-            st.session_state.token
+            token=token
         )
 
         if response.status_code == 201:
@@ -58,7 +87,7 @@ with st.expander("➕ Add New Supplier"):
         else:
             try:
                 error = response.json()["error"]
-            except:
+            except Exception:
                 error = response.text
 
             st.error(error)
@@ -113,7 +142,7 @@ if st.session_state.edit_supplier:
             response = put(
                 f"/suppliers/{supplier['id']}",
                 data,
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 200:
@@ -146,7 +175,7 @@ search = st.text_input(
 # ==================================================
 response = get(
     "/suppliers/",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code == 200:
@@ -212,7 +241,7 @@ if response.status_code == 200:
 
                     response = get(
                         f"/suppliers/{supplier['id']}",
-                        st.session_state.token
+                        token=token
                     )
 
                     if response.status_code == 200:
@@ -233,7 +262,7 @@ if response.status_code == 200:
 
                     response = delete(
                         f"/suppliers/{supplier['id']}",
-                        st.session_state.token
+                        token=token
                     )
 
                     if response.status_code == 200:
@@ -257,4 +286,3 @@ else:
     st.error(
         "Failed to load suppliers."
     )
-

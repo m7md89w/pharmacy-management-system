@@ -170,7 +170,7 @@ class MedicineBatch(Base):
     batch_id = Column(Integer, primary_key=True, autoincrement=True)
     medicine_id = Column(
         Integer,
-        ForeignKey('medicines.medicine_id', onupdate='CASCADE', ondelete='CASCADE'),
+        ForeignKey('medicines.medicine_id', onupdate='CASCADE', ondelete='RESTRICT'), # تم التعديل إلى RESTRICT لمنع الحذف
         nullable=False
     )
     supplier_id = Column(
@@ -216,7 +216,12 @@ class Inventory(Base):
     __tablename__ = 'inventory'
     
     inventory_id = Column(Integer, primary_key=True, autoincrement=True)
-    medicine_id = Column(Integer, ForeignKey('medicines.medicine_id', onupdate='CASCADE', ondelete='CASCADE'), nullable=False, unique=True)
+    medicine_id = Column(
+        Integer, 
+        ForeignKey('medicines.medicine_id', onupdate='CASCADE', ondelete='RESTRICT'), # تم التعديل إلى RESTRICT لمنع الحذف
+        nullable=False, 
+        unique=True
+    )
     quantity = Column(Integer, nullable=False, default=0)
     min_stock_level = Column(Integer, nullable=False, default=0)
     location = Column(String(100))
@@ -431,9 +436,11 @@ class SalesInvoice(Base):
     )
 
     sale_items = relationship(
-        "SaleItem",
-        back_populates="sales_invoice"
-    )
+    "SaleItem",
+    back_populates="sales_invoice",
+    cascade="all, delete-orphan",
+    passive_deletes=True
+)
 
 
 Index(

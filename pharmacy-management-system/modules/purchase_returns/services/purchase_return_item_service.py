@@ -6,18 +6,15 @@ from modules.purchase_returns.repository.purchase_return_item_repository import 
 from modules.purchase_returns.repository.purchase_return_repository import (
     PurchaseReturnRepository
 )
-
 from modules.purchases.repository.purchase_item_repository import (
     PurchaseItemRepository
 )
-
 from modules.medicines.repository.medicine_repository import (
     MedicineRepository
 )
 from modules.medicines.repository.medicine_batch_repository import (
     MedicineBatchRepository
 )
-
 from modules.audit_logs.repository.audit_log_repository import (
     AuditLogRepository
 )
@@ -48,7 +45,6 @@ class PurchaseReturnItemService:
         self,
         data: dict
     ):
-
         purchase_return = self.return_repo.get_by_id(
             data["return_id"]
         )
@@ -112,13 +108,11 @@ class PurchaseReturnItemService:
         )
 
         for existing in draft_items:
-
             if (
                 existing.purchase_item_id
                 ==
                 purchase_item.purchase_item_id
             ):
-
                 draft_returned += existing.quantity
 
         purchase_remaining = (
@@ -140,11 +134,30 @@ class PurchaseReturnItemService:
             batch_available
         )
 
+
+        print("========== BATCH ==========")
+        print("Batch ID        :", batch.batch_id)
+        print("Batch Number    :", batch.batch_number)
+        print("Medicine ID     :", batch.medicine_id)
+        print("Batch Qty       :", batch.quantity)
+        print("================================")
+     
+        print("========== PURCHASE RETURN ==========")
+        print("Purchase Item Qty :", purchase_item.quantity)
+        print("Completed Returned:", completed_returned)
+        print("Draft Returned    :", draft_returned)
+        print("Batch Qty         :", batch.quantity)
+        print("Purchase Remaining:", purchase_remaining)
+        print("Batch Available   :", batch_available)
+        print("Available Qty     :", available_quantity)
+        print("====================================")
+
+
         if available_quantity <= 0:
             raise ValueError(
                 "No quantity available for return."
             )
-
+        
         if quantity > available_quantity:
             raise ValueError(
                 f"Only {available_quantity} item(s) can be returned."
@@ -163,31 +176,22 @@ class PurchaseReturnItemService:
         )
 
         item = self.item_repo.create({
-
             "return_id":
                 purchase_return.return_id,
-
             "purchase_item_id":
                 purchase_item.purchase_item_id,
-
             "medicine_id":
                 purchase_item.medicine_id,
-
             "batch_id":
                 purchase_item.batch_id,
-
             "quantity":
                 quantity,
-
             "unit_cost":
                 unit_cost,
-
             "subtotal":
                 subtotal,
-
             "reason":
                 data.get("reason")
-
         })
 
         purchase_return.total_amount = (
@@ -205,26 +209,21 @@ class PurchaseReturnItemService:
         )
 
         self.audit_repo.create({
-
             "user_id":
                 purchase_return.user_id,
-
             "action":
                 "CREATE_PURCHASE_RETURN_ITEM",
-
             "table_name":
                 "purchase_return_items",
-
             "record_id":
                 item.return_item_id,
-
             "details":
                 f"Added Purchase Return Item #{item.return_item_id}"
-
         })
 
         return item
-        # ==================================================
+
+    # ==================================================
     # UPDATE
     # ==================================================
     def update_item(
@@ -232,7 +231,6 @@ class PurchaseReturnItemService:
         item,
         quantity: int
     ):
-
         purchase_return = self.return_repo.get_by_id(
             item.return_id
         )
@@ -283,14 +281,12 @@ class PurchaseReturnItemService:
         )
 
         for existing in draft_items:
-
             if (
                 existing.purchase_item_id
                 == purchase_item.purchase_item_id
                 and
                 existing.return_item_id != item.return_item_id
             ):
-
                 draft_returned += existing.quantity
 
         purchase_remaining = (
@@ -312,11 +308,32 @@ class PurchaseReturnItemService:
             batch_available
         )
 
+
+        print("========== BATCH ==========")
+        print("Batch ID        :", batch.batch_id)
+        print("Batch Number    :", batch.batch_number)
+        print("Medicine ID     :", batch.medicine_id)
+        print("Batch Qty       :", batch.quantity)
+        print("================================")
+     
+        print("========== PURCHASE RETURN ==========")
+        print("Purchase Item Qty :", purchase_item.quantity)
+        print("Completed Returned:", completed_returned)
+        print("Draft Returned    :", draft_returned)
+        print("Batch Qty         :", batch.quantity)
+        print("Purchase Remaining:", purchase_remaining)
+        print("Batch Available   :", batch_available)
+        print("Available Qty     :", available_quantity)
+        print("====================================")
+
+
+
         if available_quantity <= 0:
             raise ValueError(
                 "No quantity available for return."
             )
-
+        
+        
         if quantity > available_quantity:
             raise ValueError(
                 f"Only {available_quantity} item(s) can be returned."
@@ -335,10 +352,8 @@ class PurchaseReturnItemService:
         for return_item in self.item_repo.get_by_return(
             purchase_return.return_id
         ):
-
             if return_item.return_item_id == item.return_item_id:
                 continue
-
             purchase_return.total_amount += Decimal(
                 str(return_item.subtotal)
             )
@@ -360,7 +375,6 @@ class PurchaseReturnItemService:
         self,
         return_item_id: int
     ):
-
         item = self.item_repo.get_by_id(
             return_item_id
         )
@@ -379,7 +393,6 @@ class PurchaseReturnItemService:
         self,
         return_id: int
     ):
-
         purchase_return = self.return_repo.get_by_id(
             return_id
         )
@@ -400,7 +413,6 @@ class PurchaseReturnItemService:
         self,
         purchase_id: int
     ):
-
         purchase_return = (
             self.return_repo.get_completed_by_purchase(
                 purchase_id
@@ -413,16 +425,14 @@ class PurchaseReturnItemService:
         return self.item_repo.get_by_completed_purchase(
             purchase_id
         )
-    
 
-        # ==================================================
+    # ==================================================
     # DELETE
     # ==================================================
     def delete_item(
         self,
         item
     ):
-
         purchase_return = self.return_repo.get_by_id(
             item.return_id
         )
@@ -451,22 +461,16 @@ class PurchaseReturnItemService:
         )
 
         self.audit_repo.create({
-
             "user_id":
                 purchase_return.user_id,
-
             "action":
                 "DELETE_PURCHASE_RETURN_ITEM",
-
             "table_name":
                 "purchase_return_items",
-
             "record_id":
                 item.return_item_id,
-
             "details":
                 f"Deleted Purchase Return Item #{item.return_item_id}"
-
         })
 
         self.item_repo.delete(

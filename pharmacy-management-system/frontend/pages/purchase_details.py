@@ -1,29 +1,51 @@
 import streamlit as st
-
+from datetime import datetime
 from services.api_client import (
     get,
     post,
     put,
     delete
 )
+from components.sidebar import render_sidebar
 
 st.set_page_config(
     page_title="Purchase Details",
     page_icon="📄",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("📄 Purchase Details")
 
 # ==================================================
 # AUTH
 # ==================================================
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
 
+if not token:
     st.warning(
         "Please login first."
     )
-
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if (
@@ -46,7 +68,7 @@ purchase_id = st.session_state.selected_purchase
 # ==================================================
 response = get(
     f"/purchase-orders/{purchase_id}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -64,7 +86,7 @@ purchase = response.json()
 # ==================================================
 response = get(
     "/suppliers/",
-    st.session_state.token
+    token=token
 )
 
 supplier_name = "Unknown Supplier"
@@ -86,7 +108,7 @@ if response.status_code == 200:
 # ==================================================
 response = get(
     f"/purchase-items/purchase/{purchase_id}",
-    st.session_state.token
+    token=token
 )
 
 purchase_items = []
@@ -100,7 +122,7 @@ if response.status_code == 200:
 # ==================================================
 response = get(
     f"/purchase-returns/purchase/{purchase_id}",
-    st.session_state.token
+    token=token
 )
 
 purchase_returns = []
@@ -114,7 +136,7 @@ if response.status_code == 200:
 # ==================================================
 response = get(
     f"/purchase-return-items/purchase/{purchase_id}",
-    st.session_state.token
+    token=token
 )
 
 completed_return_items = []
@@ -185,7 +207,7 @@ if purchase["status"] == "PENDING":
 
     response = get(
         "/medicines/",
-        st.session_state.token
+        token=token
     )
 
     medicines = []
@@ -225,20 +247,17 @@ if purchase["status"] == "PENDING":
 
             quantity = st.number_input(
                 "Quantity",
-                min_value=1,
                 value=1
             )
 
             unit_cost = st.number_input(
                 "Unit Cost",
-                min_value=0.0,
                 value=0.0,
                 step=0.1
             )
 
             selling_price = st.number_input(
                 "Selling Price",
-                min_value=0.0,
                 value=0.0,
                 step=0.1
             )
@@ -295,7 +314,7 @@ if purchase["status"] == "PENDING":
 
                 },
 
-                st.session_state.token
+                token=token
 
             )
 
@@ -315,7 +334,7 @@ if purchase["status"] == "PENDING":
                         response.json()["error"]
                     )
 
-                except:
+                except Exception:
 
                     st.error(
                         response.text
@@ -424,8 +443,6 @@ else:
 
                     "Quantity",
 
-                    min_value=1,
-
                     value=item["quantity"],
 
                     key=f"qty_{item['purchase_item_id']}"
@@ -436,8 +453,6 @@ else:
 
                     "Unit Cost",
 
-                    min_value=0.0,
-
                     value=float(item["unit_cost"]),
 
                     key=f"cost_{item['purchase_item_id']}"
@@ -447,8 +462,6 @@ else:
                 sell = st.number_input(
 
                     "Selling Price",
-
-                    min_value=0.0,
 
                     value=float(item["selling_price"]),
 
@@ -470,7 +483,7 @@ else:
 
                     "Manufacture Date",
 
-                    value=item["manufacture_date"],
+                    value=datetime.strptime(item["manufacture_date"], "%Y-%m-%d").date() if isinstance(item["manufacture_date"], str) else item["manufacture_date"],
 
                     key=f"mfg_{item['purchase_item_id']}"
 
@@ -480,7 +493,7 @@ else:
 
                     "Expiry Date",
 
-                    value=item["expiry_date"],
+                    value=datetime.strptime(item["expiry_date"], "%Y-%m-%d").date() if isinstance(item["expiry_date"], str) else item["expiry_date"],
 
                     key=f"exp_{item['purchase_item_id']}"
 
@@ -520,7 +533,7 @@ else:
 
                             },
 
-                            st.session_state.token
+                            token=token
 
                         )
 
@@ -540,7 +553,7 @@ else:
                                     response.json()["error"]
                                 )
 
-                            except:
+                            except Exception:
 
                                 st.error(
                                     response.text
@@ -562,7 +575,7 @@ else:
 
                             f"/purchase-items/{item['purchase_item_id']}",
 
-                            st.session_state.token
+                            token=token
 
                         )
 
@@ -582,7 +595,7 @@ else:
                                     response.json()["error"]
                                 )
 
-                            except:
+                            except Exception:
 
                                 st.error(
                                     response.text
@@ -615,7 +628,7 @@ if purchase["status"] == "PENDING":
 
             },
 
-            st.session_state.token
+            token=token
 
         )
 
@@ -635,7 +648,7 @@ if purchase["status"] == "PENDING":
                     response.json()["error"]
                 )
 
-            except:
+            except Exception:
 
                 st.error(
                     response.text
@@ -799,7 +812,7 @@ if (
 
             },
 
-            st.session_state.token
+            token=token
 
         )
 
@@ -827,7 +840,7 @@ if (
                     response.json()["error"]
                 )
 
-            except:
+            except Exception:
 
                 st.error(
                     response.text

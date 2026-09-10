@@ -1,201 +1,92 @@
+from components.sidebar import render_sidebar
+import pandas as pd
+from services.api_client import delete, get, post, put
 import streamlit as st
 
-from services.api_client import (
-    get,
-    post,
-    put,
-    delete
+# ==================================================
+# PAGE CONFIGURATION
+# ==================================================
+st.set_page_config(
+    page_title="Medicines",
+    page_icon="💊",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-st.title("💊 Medicines")
+st.markdown(
+    """
+    <style>
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-if "token" not in st.session_state:
-    st.warning("Please login first.")
-    st.stop()
+render_sidebar()
+
+st.title("💊 Medicines Management")
+
+# ==================================================
+# AUTHENTICATION CHECK
+# ==================================================
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
+  st.warning("Please login first.")
+  if st.button("Go to Login / Main Page"):
+    st.switch_page("app.py")
+  st.stop()
 
 if "restore_barcode" not in st.session_state:
-    st.session_state.restore_barcode = None
+  st.session_state.restore_barcode = None
 
 if "edit_medicine" not in st.session_state:
-    st.session_state.edit_medicine = None
+  st.session_state.edit_medicine = None
+
+
+# ==================================================
+# FETCH CATEGORIES & MANUFACTURERS FOR DROPDOWNS
+# ==================================================
+categories_res = get("/categories/", token)
+categories_map = {}
+category_options = []
+
+if categories_res.status_code == 200:
+  categories_data = categories_res.json()
+  categories_map = {
+      cat["category_name"]: cat["category_id"] for cat in categories_data
+  }
+  category_options = list(categories_map.keys())
+
+manufacturers_res = get("/manufacturers/", token)
+manufacturers_map = {}
+manufacturer_options = []
+
+if manufacturers_res.status_code == 200:
+  manufacturers_data = manufacturers_res.json()
+  manufacturers_map = {
+      man["name"]: man["manufacturer_id"] for man in manufacturers_data
+  }
+  manufacturer_options = list(manufacturers_map.keys())
 
 
 # ==================================================
 # CREATE MEDICINE
 # ==================================================
 with st.expander("➕ Add New Medicine"):
+  col1, col2 = st.columns(2)
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        scientific_name = st.text_input(
-            "Scientific Name"
-        )
-
-        commercial_name = st.text_input(
-            "Commercial Name"
-        )
-
-        barcode = st.text_input(
-            "Barcode"
-        )
-
-    with col2:
-        dosage_form = st.selectbox(
-            "Dosage Form",
-            [
-                "TABLET",
-                "CAPSULE",
-                "SYRUP",
-                "INJECTION",
-                "OINTMENT",
-                "DROPS",
-                "CREAM",
-                "POWDER",
-                "OTHER"
-            ]
-        )
-
-        price = st.number_input(
-            "Selling Price",
-            min_value=0.0,
-            step=1.0
-        )
-
-        requires_prescription = st.checkbox(
-            "Requires Prescription"
-        )
-
-    if st.button(
-        "Create Medicine",
-        type="primary"
-    ):
-
-        data = {
-            "scientific_name":
-            scientific_name.strip(),
-
-            "commercial_name":
-            commercial_name.strip(),
-
-            "barcode":
-            barcode.strip(),
-
-            "dosage_form":
-            dosage_form,
-
-            "selling_price":
-            float(price),
-
-            "requires_prescription":
-            requires_prescription,
-
-            "category_id": 1,
-            "manufacturer_id": 1
-        }
-
-        response = post(
-            "/medicines/",
-            data,
-            st.session_state.token
-        )
-
-        if response.status_code == 201:
-
-            st.success(
-                "✅ Medicine created successfully."
-            )
-
-            st.rerun()
-
-        else:
-
-            try:
-                error = response.json()["error"]
-            except:
-                error = response.text
-
-            if error == "Medicine exists but is inactive.":
-
-                st.session_state.restore_barcode = (
-                    barcode
-                )
-
-                st.warning(
-                    "⚠️ This medicine already exists but is inactive."
-                )
-
-            else:
-                st.error(error)
-
-
-# ==================================================
-# RESTORE MEDICINE
-# ==================================================
-if st.session_state.restore_barcode:
-
-    st.info(
-        f"Restore medicine with barcode: "
-        f"{st.session_state.restore_barcode}"
+  with col1:
+    scientific_name = st.text_input("Scientific Name", key="create_sci")
+    commercial_name = st.text_input("Commercial Name", key="create_com")
+    barcode = st.text_input("Barcode", key="create_bar")
+    location = st.text_input(
+        "Storage Location (e.g., Shelf A-1)", key="create_loc"
     )
 
-    if st.button(
-        "♻️ Restore Medicine"
-    ):
-
-        response = put(
-            f"/medicines/restore/{st.session_state.restore_barcode}",
-            {},
-            st.session_state.token
-        )
-
-        if response.status_code == 200:
-
-            st.success(
-                "✅ Medicine restored successfully."
-            )
-
-            st.session_state.restore_barcode = None
-            st.rerun()
-
-        else:
-
-            try:
-                error = response.json()["error"]
-            except:
-                error = response.text
-
-            st.error(error)
-
-
-# ==================================================
-# EDIT MEDICINE
-# ==================================================
-if st.session_state.edit_medicine:
-
-    medicine = st.session_state.edit_medicine
-
-    st.divider()
-    st.subheader("✏️ Edit Medicine")
-
-    scientific_name = st.text_input(
-        "Scientific Name",
-        value=medicine["scientific_name"],
-        key="edit_scientific"
-    )
-
-    commercial_name = st.text_input(
-        "Commercial Name",
-        value=medicine["commercial_name"],
-        key="edit_commercial"
-    )
-
-    barcode = st.text_input(
-        "Barcode",
-        value=medicine["barcode"],
-        key="edit_barcode"
-    )
-
+  with col2:
     dosage_form = st.selectbox(
         "Dosage Form",
         [
@@ -207,195 +98,301 @@ if st.session_state.edit_medicine:
             "DROPS",
             "CREAM",
             "POWDER",
-            "OTHER"
+            "OTHER",
         ],
-        key="edit_dosage"
+        key="create_dosage",
     )
 
-    selling_price = st.number_input(
-        "Selling Price",
-        value=float(medicine["selling_price"]),
-        min_value=0.0,
-        key="edit_price"
+    selected_category_name = st.selectbox(
+        "Category",
+        options=category_options
+        if category_options
+        else ["No Categories Available"],
+        key="create_cat",
     )
 
-    col1, col2 = st.columns(2)
+    selected_manufacturer_name = st.selectbox(
+        "Manufacturer",
+        options=manufacturer_options
+        if manufacturer_options
+        else ["No Manufacturers Available"],
+        key="create_man",
+    )
 
-    with col1:
-        if st.button(
-            "💾 Save Changes"
-        ):
+    price = st.number_input(
+        "Selling Price", min_value=0.0, step=1.0, key="create_price"
+    )
+    min_stock_level = st.number_input(
+        "Min Stock Level", min_value=0, value=5, step=1, key="create_min_stock"
+    )
+    requires_prescription = st.checkbox(
+        "Requires Prescription", key="create_prescription"
+    )
 
-            data = {
-                "scientific_name":
-                scientific_name,
+  if st.button("Create Medicine", type="primary"):
+    if not category_options:
+      st.error(
+          "❌ Please add at least one category first in the Categories page."
+      )
+    elif not manufacturer_options:
+      st.error(
+          "❌ Please add at least one manufacturer first in the Manufacturers"
+          " page."
+      )
+    else:
+      category_id = categories_map.get(selected_category_name)
+      manufacturer_id = manufacturers_map.get(selected_manufacturer_name)
 
-                "commercial_name":
-                commercial_name,
+      data = {
+          "scientific_name": scientific_name.strip(),
+          "commercial_name": commercial_name.strip(),
+          "barcode": barcode.strip(),
+          "dosage_form": dosage_form,
+          "selling_price": float(price),
+          "requires_prescription": requires_prescription,
+          "location": location.strip() if location else "",
+          "min_stock_level": int(min_stock_level),
+          "category_id": int(category_id) if category_id else None,
+          "manufacturer_id": int(manufacturer_id) if manufacturer_id else None,
+      }
 
-                "barcode":
-                barcode,
+      response = post("/medicines/", data, token)
 
-                "dosage_form":
-                dosage_form,
+      if response.status_code == 201:
+        st.success(
+            "✅ Medicine and its inventory location created successfully."
+        )
+        st.rerun()
+      else:
+        try:
+          error = response.json()["error"]
+        except Exception:
+          error = response.text
 
-                "selling_price":
-                selling_price
-            }
-
-            response = put(
-                f"/medicines/{medicine['id']}",
-                data,
-                st.session_state.token
-            )
-
-            if response.status_code == 200:
-
-                st.success(
-                    "Medicine updated successfully."
-                )
-
-                st.session_state.edit_medicine = None
-                st.rerun()
-
-            else:
-
-                try:
-                    error = response.json()["error"]
-                except:
-                    error = response.text
-
-                st.error(error)
-
-    with col2:
-        if st.button(
-            "❌ Cancel"
-        ):
-            st.session_state.edit_medicine = None
-            st.rerun()
+        if error == "Medicine exists but is inactive.":
+          st.session_state.restore_barcode = barcode
+          st.warning("⚠️ This medicine already exists but is inactive.")
+        else:
+          st.error(error)
 
 
 # ==================================================
-# SEARCH
+# RESTORE MEDICINE
+# ==================================================
+if st.session_state.restore_barcode:
+  st.info(f"Restore medicine with barcode: {st.session_state.restore_barcode}")
+
+  if st.button("♻️ Restore Medicine"):
+    response = put(
+        f"/medicines/restore/{st.session_state.restore_barcode}", {}, token
+    )
+
+    if response.status_code == 200:
+      st.success("✅ Medicine restored successfully.")
+      st.session_state.restore_barcode = None
+      st.rerun()
+    else:
+      try:
+        error = response.json()["error"]
+      except Exception:
+        error = response.text
+      st.error(error)
+
+
+# ==================================================
+# EDIT MEDICINE
+# ==================================================
+if st.session_state.edit_medicine:
+  medicine = st.session_state.edit_medicine
+
+  st.divider()
+  st.subheader("✏️ Edit Medicine")
+
+  scientific_name = st.text_input(
+      "Scientific Name",
+      value=medicine.get("scientific_name", ""),
+      key="edit_scientific",
+  )
+  commercial_name = st.text_input(
+      "Commercial Name",
+      value=medicine.get("commercial_name", ""),
+      key="edit_commercial",
+  )
+  barcode = st.text_input(
+      "Barcode", value=medicine.get("barcode", ""), key="edit_barcode"
+  )
+  location = st.text_input(
+      "Storage Location",
+      value=medicine.get("location", ""),
+      key="edit_location",
+  )
+
+  dosage_form = st.selectbox(
+      "Dosage Form",
+      [
+          "TABLET",
+          "CAPSULE",
+          "SYRUP",
+          "INJECTION",
+          "OINTMENT",
+          "DROPS",
+          "CREAM",
+          "POWDER",
+          "OTHER",
+      ],
+      key="edit_dosage",
+  )
+
+  # تحديد التصنيف الحالي للدواء افتراضياً
+  current_cat_id = medicine.get("category_id")
+  current_cat_name = next(
+      (name for name, cid in categories_map.items() if cid == current_cat_id),
+      category_options[0] if category_options else None,
+  )
+
+  edit_selected_category = st.selectbox(
+      "Category",
+      options=category_options
+      if category_options
+      else ["No Categories Available"],
+      index=category_options.index(current_cat_name)
+      if current_cat_name in category_options
+      else 0,
+      key="edit_category_select",
+  )
+
+  # تحديد الشركة المصنعة الحالية للدواء افتراضياً
+  current_man_id = medicine.get("manufacturer_id")
+  current_man_name = next(
+      (name for name, mid in manufacturers_map.items() if mid == current_man_id),
+      manufacturer_options[0] if manufacturer_options else None,
+  )
+
+  edit_selected_manufacturer = st.selectbox(
+      "Manufacturer",
+      options=manufacturer_options
+      if manufacturer_options
+      else ["No Manufacturers Available"],
+      index=manufacturer_options.index(current_man_name)
+      if current_man_name in manufacturer_options
+      else 0,
+      key="edit_manufacturer_select",
+  )
+
+  selling_price = st.number_input(
+      "Selling Price",
+      value=float(medicine.get("selling_price", 0.0)),
+      min_value=0.0,
+      key="edit_price",
+  )
+
+  col1, col2 = st.columns(2)
+
+  with col1:
+    if st.button("💾 Save Changes"):
+      category_id = categories_map.get(edit_selected_category)
+      manufacturer_id = manufacturers_map.get(edit_selected_manufacturer)
+
+      data = {
+          "scientific_name": scientific_name,
+          "commercial_name": commercial_name,
+          "barcode": barcode,
+          "dosage_form": dosage_form,
+          "selling_price": selling_price,
+          "location": location,
+          "category_id": int(category_id) if category_id else None,
+          "manufacturer_id": int(manufacturer_id) if manufacturer_id else None,
+      }
+
+      response = put(f"/medicines/{medicine['id']}", data, token)
+
+      if response.status_code == 200:
+        st.success("Medicine updated successfully.")
+        st.session_state.edit_medicine = None
+        st.rerun()
+      else:
+        try:
+          error = response.json()["error"]
+        except Exception:
+          error = response.text
+        st.error(error)
+
+  with col2:
+    if st.button("❌ Cancel"):
+      st.session_state.edit_medicine = None
+      st.rerun()
+
+
+# ==================================================
+# SEARCH & LIST
 # ==================================================
 st.divider()
-
-search = st.text_input(
-    "🔍 Search by Name, Scientific Name, or Barcode"
-)
+search = st.text_input("🔍 Search by Name, Scientific Name, or Barcode")
 
 if st.button("🔄 Refresh"):
-    st.rerun()
+  st.rerun()
 
-
-# ==================================================
-# LOAD MEDICINES
-# ==================================================
-response = get(
-    "/medicines/",
-    st.session_state.token
-)
+response = get("/medicines/", token)
 
 if response.status_code == 200:
+  medicines = response.json()
 
-    medicines = response.json()
+  if search:
+    query = search.lower()
+    medicines = [
+        medicine
+        for medicine in medicines
+        if query in str(medicine["commercial_name"]).lower()
+        or query in str(medicine["scientific_name"]).lower()
+        or query in str(medicine["barcode"]).lower()
+    ]
 
-    if search:
+  st.subheader(f"Medicines ({len(medicines)})")
 
-        query = search.lower()
+  if medicines:
+    for medicine in medicines:
+      col1, col2, col3, col4, col5 = st.columns([5, 2, 2, 1, 1])
 
-        medicines = [
-            medicine
-            for medicine in medicines
-            if (
-                query in str(
-                    medicine["commercial_name"]
-                ).lower()
-                or
-                query in str(
-                    medicine["scientific_name"]
-                ).lower()
-                or
-                query in str(
-                    medicine["barcode"]
-                ).lower()
-            )
-        ]
+      with col1:
+        st.write(f"💊 **{medicine['commercial_name']}**")
+        st.caption(medicine["scientific_name"])
+        if medicine.get("location"):
+          st.caption(f"📍 Location: {medicine['location']}")
 
-    st.subheader(
-        f"Medicines ({len(medicines)})"
-    )
+      with col2:
+        st.write(f"Barcode: {medicine['barcode']}")
 
-    if medicines:
+      with col3:
+        st.write(f"{medicine['selling_price']} JOD")
 
-        for medicine in medicines:
+      with col4:
+        if st.button("✏️", key=f"edit_{medicine['id']}"):
+          # جلب البيانات الكاملة للدواء (بما فيها manufacturer_id) لضمان ظهورها بدقة عند التعديل
+          detail_res = get(f"/medicines/{medicine['id']}", token)
+          if detail_res.status_code == 200:
+            st.session_state.edit_medicine = detail_res.json()
+          else:
+            st.session_state.edit_medicine = medicine
+          st.rerun()
 
-            col1, col2, col3, col4, col5 = st.columns(
-                [5, 2, 2, 1, 1]
-            )
+      with col5:
+        if st.button("🗑️", key=f"delete_{medicine['id']}"):
+          response = delete(f"/medicines/{medicine['id']}", token)
 
-            with col1:
-                st.write(
-                    f"💊 **{medicine['commercial_name']}**"
-                )
-                st.caption(
-                    medicine["scientific_name"]
-                )
+          if response.status_code == 200:
+            st.success("Medicine deleted successfully.")
+            st.rerun()
+          else:
+            try:
+              error = response.json()["error"]
+            except Exception:
+              error = response.text
+            st.error(error)
 
-            with col2:
-                st.write(
-                    f"Barcode: {medicine['barcode']}"
-                )
+      st.divider()
 
-            with col3:
-                st.write(
-                    f"{medicine['selling_price']} JOD"
-                )
-
-            with col4:
-                if st.button(
-                    "✏️",
-                    key=f"edit_{medicine['id']}"
-                ):
-                    st.session_state.edit_medicine = medicine
-                    st.rerun()
-
-            with col5:
-                if st.button(
-                    "🗑️",
-                    key=f"delete_{medicine['id']}"
-                ):
-
-                    response = delete(
-                        f"/medicines/{medicine['id']}",
-                        st.session_state.token
-                    )
-
-                    if response.status_code == 200:
-
-                        st.success(
-                            "Medicine deleted successfully."
-                        )
-
-                        st.rerun()
-
-                    else:
-
-                        try:
-                            error = response.json()["error"]
-                        except:
-                            error = response.text
-
-                        st.error(error)
-
-            st.divider()
-
-    else:
-        st.info(
-            "No medicines found."
-        )
+  else:
+    st.info("No medicines found.")
 
 else:
-    st.error(
-        "Failed to load medicines."
-    )
+  st.error("Failed to load medicines.")

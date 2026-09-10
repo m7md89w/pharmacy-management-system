@@ -1,25 +1,12 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
 from database.session import SessionLocal
-from modules.medicines.repository.medicine_repository import (
-    MedicineRepository
-)
-from modules.medicines.services.medicine_service import (
-    MedicineService
-)
+from modules.auth.decorators.auth_required import auth_required
+from modules.auth.decorators.role_required import role_required
+from modules.medicines.repository.medicine_repository import MedicineRepository
+from modules.medicines.services.medicine_service import MedicineService
 
-from modules.auth.decorators.auth_required import (
-    auth_required
-)
-from modules.auth.decorators.role_required import (
-    role_required
-)
-
-medicine_controller = Blueprint(
-    "medicines",
-    __name__,
-    url_prefix="/medicines"
-)
+medicine_controller = Blueprint("medicines", __name__, url_prefix="/medicines")
 
 
 # =========================================================
@@ -29,61 +16,53 @@ medicine_controller = Blueprint(
 @auth_required
 @role_required([1, 2])
 def create_medicine():
+  db = SessionLocal()
+  try:
+    repo = MedicineRepository(db)
+    service = MedicineService(repo)
 
-    db = SessionLocal()
+    data = request.get_json()
+    medicine = service.create_medicine(data)
 
-    try:
-        repo = MedicineRepository(db)
-        service = MedicineService(repo)
-
-        data = request.get_json()
-
-        medicine = service.create_medicine(data)
-
-        return jsonify({
+    return (
+        jsonify({
             "message": "Medicine created successfully",
             "id": medicine.medicine_id,
             "commercial_name": medicine.commercial_name,
-            "barcode": medicine.barcode
-        }), 201
+            "barcode": medicine.barcode,
+        }),
+        201,
+    )
 
-    except ValueError as e:
-        db.rollback()
+  except ValueError as e:
+    db.rollback()
+    return jsonify({"error": str(e)}), 400
 
-        return jsonify({
-            "error": str(e)
-        }), 400
+  except Exception as e:
+    db.rollback()
+    print("MEDICINE CREATE ERROR:")
+    print(e)
+    return jsonify({"error": "Internal Server Error"}), 500
 
-    except Exception as e:
-        db.rollback()
-
-        print("MEDICINE CREATE ERROR:")
-        print(e)
-
-        return jsonify({
-            "error": "Internal Server Error"
-        }), 500
-
-    finally:
-        db.close()
+  finally:
+    db.close()
 
 
 # =========================================================
-# GET ALL MEDICINES
+# GET ALL MEDICINES (تحديث لإرسال الـ location)
 # =========================================================
 @medicine_controller.route("/", methods=["GET"])
 @auth_required
 def get_medicines():
+  db = SessionLocal()
+  try:
+    repo = MedicineRepository(db)
+    service = MedicineService(repo)
 
-    db = SessionLocal()
+    medicines = service.get_all_medicines()
 
-    try:
-        repo = MedicineRepository(db)
-        service = MedicineService(repo)
-
-        medicines = service.get_all_medicines()
-
-        return jsonify([
+    return (
+        jsonify([
             {
                 "id": m.medicine_id,
                 "scientific_name": m.scientific_name,
@@ -91,36 +70,36 @@ def get_medicines():
                 "barcode": m.barcode,
                 "dosage_form": m.dosage_form,
                 "selling_price": float(m.selling_price)
-                if m.selling_price else 0.0
+                if m.selling_price
+                else 0.0,
+                "location": m.inventory.location
+                if m.inventory and m.inventory.location
+                else "",
             }
             for m in medicines
-        ])
+        ]),
+        200,
+    )
 
-    finally:
-        db.close()
+  finally:
+    db.close()
 
 
 # =========================================================
-# GET MEDICINE BY ID
+# GET MEDICINE BY ID (تحديث لإرسال الـ location)
 # =========================================================
-@medicine_controller.route(
-    "/<int:medicine_id>",
-    methods=["GET"]
-)
+@medicine_controller.route("/<int:medicine_id>", methods=["GET"])
 @auth_required
 def get_medicine(medicine_id):
+  db = SessionLocal()
+  try:
+    repo = MedicineRepository(db)
+    service = MedicineService(repo)
 
-    db = SessionLocal()
+    medicine = service.get_medicine(medicine_id)
 
-    try:
-        repo = MedicineRepository(db)
-        service = MedicineService(repo)
-
-        medicine = service.get_medicine(
-            medicine_id
-        )
-
-        return jsonify({
+    return (
+        jsonify({
             "id": medicine.medicine_id,
             "scientific_name": medicine.scientific_name,
             "commercial_name": medicine.commercial_name,
@@ -131,167 +110,124 @@ def get_medicine(medicine_id):
             "category_id": medicine.category_id,
             "manufacturer_id": medicine.manufacturer_id,
             "selling_price": float(medicine.selling_price)
-            if medicine.selling_price else 0.0
-        })
+            if medicine.selling_price
+            else 0.0,
+            "location": medicine.inventory.location
+            if medicine.inventory and medicine.inventory.location
+            else "",
+        }),
+        200,
+    )
 
-    except ValueError as e:
-        return jsonify({
-            "error": str(e)
-        }), 404
+  except ValueError as e:
+    return jsonify({"error": str(e)}), 404
 
-    finally:
-        db.close()
+  finally:
+    db.close()
 
 
 # =========================================================
 # UPDATE MEDICINE
 # =========================================================
-@medicine_controller.route(
-    "/<int:medicine_id>",
-    methods=["PUT"]
-)
+@medicine_controller.route("/<int:medicine_id>", methods=["PUT"])
 @auth_required
 @role_required([1, 2])
 def update_medicine(medicine_id):
+  db = SessionLocal()
+  try:
+    repo = MedicineRepository(db)
+    service = MedicineService(repo)
 
-    db = SessionLocal()
+    medicine = service.get_medicine(medicine_id)
+    data = request.get_json()
 
-    try:
-        repo = MedicineRepository(db)
-        service = MedicineService(repo)
+    updated = service.update_medicine(medicine, data)
 
-        medicine = service.get_medicine(
-            medicine_id
-        )
+    return (
+        jsonify(
+            {"message": "Medicine updated successfully", "id": updated.medicine_id}
+        ),
+        200,
+    )
 
-        data = request.get_json()
+  except ValueError as e:
+    db.rollback()
+    return jsonify({"error": str(e)}), 400
 
-        updated = service.update_medicine(
-            medicine,
-            data
-        )
+  except Exception as e:
+    db.rollback()
+    print("MEDICINE UPDATE ERROR:")
+    print(e)
+    return jsonify({"error": "Internal Server Error"}), 500
 
-        return jsonify({
-            "message": "Medicine updated successfully",
-            "id": updated.medicine_id
-        })
-
-    except ValueError as e:
-        db.rollback()
-
-        return jsonify({
-            "error": str(e)
-        }), 400
-
-    except Exception as e:
-        db.rollback()
-
-        print("MEDICINE UPDATE ERROR:")
-        print(e)
-
-        return jsonify({
-            "error": "Internal Server Error"
-        }), 500
-
-    finally:
-        db.close()
+  finally:
+    db.close()
 
 
 # =========================================================
 # RESTORE MEDICINE
 # =========================================================
-@medicine_controller.route(
-    "/restore/<string:barcode>",
-    methods=["PUT"]
-)
+@medicine_controller.route("/restore/<string:barcode>", methods=["PUT"])
 @auth_required
 @role_required([1, 2])
 def restore_medicine(barcode):
+  db = SessionLocal()
+  try:
+    repo = MedicineRepository(db)
+    service = MedicineService(repo)
 
-    db = SessionLocal()
+    medicine = service.restore_medicine(barcode)
 
-    try:
-        repo = MedicineRepository(db)
-        service = MedicineService(repo)
-
-        medicine = service.restore_medicine(
-            barcode
-        )
-
-        return jsonify({
+    return (
+        jsonify({
             "message": "Medicine restored successfully",
             "id": medicine.medicine_id,
-            "commercial_name": medicine.commercial_name
-        })
+            "commercial_name": medicine.commercial_name,
+        }),
+        200,
+    )
 
-    except ValueError as e:
-        db.rollback()
+  except ValueError as e:
+    db.rollback()
+    return jsonify({"error": str(e)}), 404
 
-        return jsonify({
-            "error": str(e)
-        }), 404
+  except Exception as e:
+    db.rollback()
+    print("MEDICINE RESTORE ERROR:")
+    print(e)
+    return jsonify({"error": "Internal Server Error"}), 500
 
-    except Exception as e:
-        db.rollback()
-
-        print("MEDICINE RESTORE ERROR:")
-        print(e)
-
-        return jsonify({
-            "error": "Internal Server Error"
-        }), 500
-
-    finally:
-        db.close()
+  finally:
+    db.close()
 
 
 # =========================================================
 # DELETE MEDICINE
 # =========================================================
-@medicine_controller.route(
-    "/<int:medicine_id>",
-    methods=["DELETE"]
-)
+@medicine_controller.route("/<int:medicine_id>", methods=["DELETE"])
 @auth_required
 @role_required([1])
 def delete_medicine(medicine_id):
+  db = SessionLocal()
+  try:
+    repo = MedicineRepository(db)
+    service = MedicineService(repo)
 
-    db = SessionLocal()
+    medicine = service.get_medicine(medicine_id)
+    service.delete_medicine(medicine)
+    db.commit()
 
-    try:
-        repo = MedicineRepository(db)
-        service = MedicineService(repo)
+    return jsonify({"message": "Medicine deleted successfully"}), 200
 
-        medicine = service.get_medicine(
-            medicine_id
-        )
+  except ValueError as e:
+    db.rollback()
+    return jsonify({"error": str(e)}), 400
 
-        service.deactivate_medicine(
-            medicine
-        )
+  except Exception as e:
+    db.rollback()
+    print("MEDICINE DELETE ERROR:")
+    print(e)
+    return jsonify({"error": "Internal Server Error"}), 500
 
-        return jsonify({
-            "message":
-            "Medicine deactivated successfully"
-        })
-
-    except ValueError as e:
-        db.rollback()
-
-        return jsonify({
-            "error": str(e)
-        }), 404
-
-    except Exception as e:
-        db.rollback()
-
-        print("MEDICINE DELETE ERROR:")
-        print(e)
-
-        return jsonify({
-            "error":
-            "Internal Server Error"
-        }), 500
-
-    finally:
-        db.close()
+  finally:
+    db.close()

@@ -1,205 +1,119 @@
 import streamlit as st
-
-from services.api_client import (
-    get
-)
+from services.api_client import get, put
+from components.sidebar import render_sidebar
 
 st.set_page_config(
-    page_title="Return History",
+    page_title="Sales Return History",
     page_icon="📜",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.title("📜 Return History")
-
-
 # ==================================================
-# AUTH
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
 # ==================================================
-if "token" not in st.session_state:
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-    st.warning(
-        "Please login first."
-    )
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
+st.title("📜 Sales Return History")
+
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
+    st.warning("Please login first.")
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
+invoice_id = st.session_state.get("selected_return_invoice")
 
-if (
-    "selected_return_invoice"
-    not in st.session_state
-):
-
-    st.warning(
-        "No invoice selected."
-    )
-
+if not invoice_id:
+    st.warning("No invoice selected.")
+    if st.button("⬅️ Back to Sales Returns"):
+        st.switch_page("pages/sales_return.py")
     st.stop()
 
-
-invoice_id = (
-    st.session_state.selected_return_invoice
-)
-
-
-# ==================================================
-# LOAD INVOICE
-# ==================================================
-response = get(
-    f"/sales-invoices/{invoice_id}",
-    st.session_state.token
-)
-
-if response.status_code != 200:
-
-    st.error(
-        "Invoice not found."
-    )
-
-    st.stop()
-
-invoice = response.json()
-
-
-# ==================================================
-# LOAD RETURNS
-# ==================================================
-response = get(
-    f"/sales-returns/invoice/{invoice_id}",
-    st.session_state.token
-)
-
-if response.status_code != 200:
-
-    st.error(
-        "Failed to load return history."
-    )
-
-    st.stop()
-
-returns = response.json()
-
-
-# ==================================================
-# HEADER
-# ==================================================
-st.subheader(
-    f"Invoice {invoice['invoice_number']}"
-)
-
-st.caption(
-    f"Invoice ID: {invoice_id}"
-)
-
-st.write(
-    f"Total Returns: {len(returns)}"
-)
+if st.button("⬅️ Back to Sales Returns"):
+    st.switch_page("pages/sales_return.py")
 
 st.divider()
 
 # ==================================================
-# NO RETURNS
+# LOAD RETURNS FOR INVOICE
 # ==================================================
-if not returns:
+response = get(
+    f"/sales-returns/invoice/{invoice_id}",
+    token=token
+)
 
-    st.info(
-        "No returns found for this invoice."
-    )
-
-    if st.button(
-        "⬅ Back"
-    ):
-
-        st.switch_page(
-            "pages/sales_return.py"
-        )
-
+if response.status_code != 200:
+    st.error("Failed to load return history.")
     st.stop()
 
+returns = response.json()
 
-# ==================================================
-# RETURN HISTORY
-# ==================================================
-for sales_return in returns:
+if not returns:
+    st.info("No returns found for this invoice.")
+    st.stop()
 
-    col1, col2, col3, col4 = (
-        st.columns(
-            [2, 2, 2, 1]
-        )
-    )
+st.subheader(f"Returns for Invoice #{invoice_id}")
 
-    with col1:
+for ret in returns:
+    return_id = ret.get("return_id")
+    status = ret.get("status")
+    total_amount = ret.get("total_amount", 0.0)
+    created_at = ret.get("created_at", "")
 
-        st.write(
-            f"Return #{sales_return['return_id']}"
-        )
+    with st.container():
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
 
-        if sales_return.get(
-            "return_date"
-        ):
+        with col1:
+            st.write(f"**Return ID:** #{return_id}")
+            st.caption(f"Date: {created_at}")
 
-            st.caption(
-                sales_return["return_date"]
-            )
+        with col2:
+            st.write(f"**Amount:** {float(total_amount):.2f} JOD")
 
-    with col2:
+        with col3:
+            if status == "COMPLETED":
+                st.success(f"Status: {status}")
+            elif status == "CANCELLED":
+                st.error(f"Status: {status}")
+            else:
+                st.warning(f"Status: {status}")
 
-        if (
-            sales_return["status"]
-            == "COMPLETED"
-        ):
+        with col4:
+            # زر الإلغاء يظهر فقط إذا كانت الحالة COMPLETED
+            if status == "COMPLETED":
+                if st.button("❌ Cancel Return", key=f"cancel_{return_id}", type="secondary", use_container_width=True):
+                    
+                    # استدعاء الـ API الخاص بالإلغاء مع تمرير التوكن صراحة
+                    cancel_response = put(
+                        f"/sales-returns/{return_id}/cancel",
+                        {},
+                        token=token
+                    )
 
-            st.success(
-                "COMPLETED"
-            )
+                    if cancel_response.status_code == 200:
+                        st.success(f"✅ Sales Return #{return_id} cancelled successfully.")
+                        st.rerun()
+                    else:
+                        try:
+                            error_msg = cancel_response.json()["error"]
+                        except Exception:
+                            error_msg = cancel_response.text
+                        st.error(f"Failed to cancel: {error_msg}")
 
-        elif (
-            sales_return["status"]
-            == "DRAFT"
-        ):
-
-            st.warning(
-                "DRAFT"
-            )
-
-        else:
-
-            st.write(
-                sales_return["status"]
-            )
-
-    with col3:
-
-        st.write(
-            f"{float(sales_return['total_amount']):.2f} JOD"
-        )
-
-    with col4:
-
-        if st.button(
-            "👁 View",
-            key=f"view_{sales_return['return_id']}"
-        ):
-
-            st.session_state.selected_sales_return = (
-                sales_return["return_id"]
-            )
-
-            st.switch_page(
-                "pages/sales_return_details.py"
-            )
-
-    st.divider()
-
-
-# ==================================================
-# BACK
-# ==================================================
-if st.button(
-    "⬅ Back to Returns",
-    use_container_width=True
-):
-
-    st.switch_page(
-        "pages/sales_return.py"
-    )
+        st.divider()

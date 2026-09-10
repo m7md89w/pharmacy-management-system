@@ -1,145 +1,91 @@
-import pandas as pd
-
+import os
+import csv
 from database.session import SessionLocal
-from models.all_models import (
-    Medicine,
-    DrugInteraction
-)
+from models.all_models import Medicine, DrugInteraction
 
 db = SessionLocal()
 
 try:
     print("Loading CSV...")
 
-    df = pd.read_csv(
-        r"pharmacy-management-system\datasets\db_drug_interactions.csv"
-    )
+    # Calculate absolute path relative to this script
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(BASE_DIR, "datasets", "db_drug_interactions.csv")
 
-    print(f"Rows: {len(df)}")
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"CSV file not found at: {csv_path}")
 
     # ==========================
     # Load medicines once
     # ==========================
-    medicines = db.query(
-        Medicine
-    ).all()
-
-    medicine_map = {
-        m.scientific_name.lower(): m
-        for m in medicines
-    }
-
-    print(
-        f"Medicines in database: {len(medicine_map)}"
-    )
+    medicines = db.query(Medicine).all()
+    medicine_map = {m.scientific_name.lower(): m for m in medicines}
+    print(f"Medicines in database: {len(medicine_map)}")
 
     # ==========================
     # Existing interactions
     # ==========================
     existing_pairs = set()
-
-    for interaction in (
-        db.query(DrugInteraction)
-        .all()
-    ):
-
-        pair = tuple(
-            sorted(
-                [
-                    interaction.medicine_1_id,
-                    interaction.medicine_2_id
-                ]
-            )
-        )
-
+    for interaction in db.query(DrugInteraction).all():
+        pair = tuple(sorted([interaction.medicine_1_id, interaction.medicine_2_id]))
         existing_pairs.add(pair)
-
-    print(
-        f"Existing interactions: {len(existing_pairs)}"
-    )
+    print(f"Existing interactions: {len(existing_pairs)}")
 
     created = 0
     skipped = 0
 
     # ==========================
-    # Import
+    # Import using standard csv module (zero dependencies)
     # ==========================
-    for _, row in df.iterrows():
+    with open(csv_path, mode="r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        
+        for row in reader:
+            drug1 = str(row.get("Drug 1", "")).strip().lower()
+            drug2 = str(row.get("Drug 2", "")).strip().lower()
+            description = str(row.get("Interaction Description", "")).strip()
 
-        drug1 = str(
-            row["Drug 1"]
-        ).strip().lower()
+            medicine1 = medicine_map.get(drug1)
+            medicine2 = medicine_map.get(drug2)
 
-        drug2 = str(
-            row["Drug 2"]
-        ).strip().lower()
+            if not medicine1 or not medicine2:
+                skipped += 1
+                continue
 
-        description = str(
-            row["Interaction Description"]
-        ).strip()
+            pair = tuple(sorted([medicine1.medicine_id, medicine2.medicine_id]))
 
-        medicine1 = medicine_map.get(
-            drug1
-        )
+            if pair in existing_pairs:
+                continue
 
-        medicine2 = medicine_map.get(
-            drug2
-        )
+            # ==========================
+            # Guess severity
+            # ==========================
+            severity = "MODERATE"
+            desc = description.lower()
 
-        if not medicine1 or not medicine2:
-            skipped += 1
-            continue
+            if "contraindicated" in desc:
+                severity = "CONTRAINDICATED"
+            elif "major" in desc:
+                severity = "MAJOR"
+            elif "minor" in desc:
+                severity = "MINOR"
 
-        pair = tuple(
-            sorted(
-                [
-                    medicine1.medicine_id,
-                    medicine2.medicine_id
-                ]
+            interaction = DrugInteraction(
+                medicine_1_id=medicine1.medicine_id,
+                medicine_2_id=medicine2.medicine_id,
+                severity=severity,
+                description=description,
+                source="DATASET"
             )
-        )
 
-        if pair in existing_pairs:
-            continue
+            db.add(interaction)
+            existing_pairs.add(pair)
+            created += 1
 
-        # ==========================
-        # Guess severity
-        # ==========================
-        severity = "MODERATE"
-
-        desc = description.lower()
-
-        if "contraindicated" in desc:
-            severity = "CONTRAINDICATED"
-
-        elif "major" in desc:
-            severity = "MAJOR"
-
-        elif "minor" in desc:
-            severity = "MINOR"
-
-        interaction = DrugInteraction(
-            medicine_1_id=medicine1.medicine_id,
-            medicine_2_id=medicine2.medicine_id,
-            severity=severity,
-            description=description,
-            source="DATASET"
-        )
-
-        db.add(interaction)
-
-        existing_pairs.add(pair)
-
-        created += 1
-
-        if created % 100 == 0:
-            print(
-                f"Created: {created}"
-            )
+            if created % 100 == 0:
+                print(f"Loaded: {created}")
 
     db.commit()
-
-    print()
     print("==============================")
     print(f"Created: {created}")
     print(f"Skipped: {skipped}")
@@ -147,9 +93,7 @@ try:
 
 except Exception as e:
     db.rollback()
-    print(
-        f"Error: {e}"
-    )
+    print(f"Error: {e}")
 
 finally:
     db.close()

@@ -5,35 +5,57 @@ from services.api_client import (
     post,
     delete
 )
+from components.sidebar import render_sidebar
 
 st.set_page_config(
     page_title="Sales Return Details",
     page_icon="↩️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("↩️ Sales Return Details")
 
 
 # ==================================================
-# AUTH
+# AUTH & SESSION CHECK
 # ==================================================
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
     st.warning("Please login first.")
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if (
-    "selected_sales_return"
-    not in st.session_state
+    "selected_sales_return" not in st.session_state
+    or not st.session_state.selected_sales_return
 ):
-    st.warning(
-        "No sales return selected."
-    )
+    st.warning("No sales return selected.")
+    if st.button("⬅️ Back to Returns"):
+        st.switch_page("pages/sales_return.py")
     st.stop()
 
-return_id = (
-    st.session_state.selected_sales_return
-)
+return_id = st.session_state.selected_sales_return
 
 
 # ==================================================
@@ -41,13 +63,13 @@ return_id = (
 # ==================================================
 response = get(
     f"/sales-returns/{return_id}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
-    st.error(
-        "Failed to load sales return."
-    )
+    st.error("Failed to load sales return.")
+    if st.button("⬅️ Back to Returns"):
+        st.switch_page("pages/sales_return.py")
     st.stop()
 
 sales_return = response.json()
@@ -57,19 +79,22 @@ is_completed = (
     == "COMPLETED"
 )
 
+is_cancelled = (
+    sales_return["status"]
+    == "CANCELLED"
+)
+
 
 # ==================================================
 # LOAD INVOICE
 # ==================================================
 response = get(
     f"/sales-invoices/{sales_return['invoice_id']}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
-    st.error(
-        "Failed to load invoice."
-    )
+    st.error("Failed to load invoice.")
     st.stop()
 
 invoice = response.json()
@@ -80,13 +105,11 @@ invoice = response.json()
 # ==================================================
 response = get(
     f"/sales-return-items/invoice/{invoice['invoice_id']}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
-    st.error(
-        "Failed to load completed return items."
-    )
+    st.error("Failed to load completed return items.")
     st.stop()
 
 completed_return_items = response.json()
@@ -96,13 +119,11 @@ completed_return_items = response.json()
 # ==================================================
 response = get(
     f"/sales-return-items/return/{return_id}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
-    st.error(
-        "Failed to load return items."
-    )
+    st.error("Failed to load return items.")
     st.stop()
 
 return_items = response.json()
@@ -113,13 +134,11 @@ return_items = response.json()
 # ==================================================
 response = get(
     f"/sale-items/invoice/{invoice['invoice_id']}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
-    st.error(
-        "Failed to load sale items."
-    )
+    st.error("Failed to load sale items.")
     st.stop()
 
 sale_items = response.json()
@@ -130,13 +149,11 @@ sale_items = response.json()
 # ==================================================
 response = get(
     "/medicines/",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
-    st.error(
-        "Failed to load medicines."
-    )
+    st.error("Failed to load medicines.")
     st.stop()
 
 medicines = response.json()
@@ -153,7 +170,6 @@ medicine_map = {
 returned_map = {}
 
 for item in completed_return_items:
-
     returned_map[
         item["sale_item_id"]
     ] = (
@@ -165,10 +181,8 @@ for item in completed_return_items:
     )
 
 # أضف عناصر الطلب الحالي (Draft)
-if not is_completed:
-
+if not is_completed and not is_cancelled:
     for item in return_items:
-
         returned_map[
             item["sale_item_id"]
         ] = (
@@ -178,6 +192,8 @@ if not is_completed:
             )
             + item["quantity"]
         )
+
+
 # ==================================================
 # RETURN INFO
 # ==================================================
@@ -200,28 +216,20 @@ Total Return: {float(sales_return['total_amount']):.2f} JOD
 st.divider()
 
 if is_completed:
-
-    st.success(
-        "This Sales Return has been completed."
-    )
-
+    st.success("This Sales Return has been completed.")
+elif is_cancelled:
+    st.warning("This Sales Return has been cancelled.")
 else:
-
-    st.subheader(
-        "➕ Add Return Item"
-    )
+    st.subheader("➕ Add Return Item")
 
     available_items = []
 
     for item in sale_items:
-
         sold = item["quantity"]
-
         returned = returned_map.get(
             item["sale_item_id"],
             0
         )
-
         remaining = sold - returned
 
         if remaining <= 0:
@@ -233,44 +241,19 @@ else:
         )
 
         available_items.append({
-
-            "sale_item_id":
-                item["sale_item_id"],
-
-            "medicine_name":
-                medicine.get(
-                    "commercial_name",
-                    "Unknown"
-                ),
-
-            "sold":
-                sold,
-
-            "returned":
-                returned,
-
-            "remaining":
-                remaining
-
+            "sale_item_id": item["sale_item_id"],
+            "medicine_name": medicine.get("commercial_name", "Unknown"),
+            "sold": sold,
+            "returned": returned,
+            "remaining": remaining
         })
 
     if not available_items:
-
-        st.info(
-            "Everything in this invoice has already been returned."
-        )
-
+        st.info("Everything in this invoice has already been returned.")
     else:
-
         labels = [
-
-            f"{item['medicine_name']} | "
-            f"Sold: {item['sold']} | "
-            f"Returned: {item['returned']} | "
-            f"Remaining: {item['remaining']}"
-
+            f"{item['medicine_name']} | Sold: {item['sold']} | Returned: {item['returned']} | Remaining: {item['remaining']}"
             for item in available_items
-
         ]
 
         selected_index = st.selectbox(
@@ -279,238 +262,145 @@ else:
             format_func=lambda i: labels[i]
         )
 
-        selected_item = available_items[
-            selected_index
-        ]
+        selected_item = available_items[selected_index]
 
         quantity = st.number_input(
-
             "Return Quantity",
-
             min_value=1,
-
-            max_value=int(
-                selected_item["remaining"]
-            ),
-
+            max_value=int(selected_item["remaining"]),
             value=1,
-
             step=1
-
         )
 
-        st.caption(
-            f"Remaining Quantity: "
-            f"{selected_item['remaining']}"
-        )
+        st.caption(f"Remaining Quantity: {selected_item['remaining']}")
 
-        if st.button(
-            "Add Return Item",
-            type="primary"
-        ):
-
+        if st.button("Add Return Item", type="primary"):
             response = post(
-
                 "/sales-return-items/",
-
                 {
-
-                    "return_id":
-                        return_id,
-
-                    "sale_item_id":
-                        selected_item["sale_item_id"],
-
-                    "quantity":
-                        quantity
-
+                    "return_id": return_id,
+                    "sale_item_id": selected_item["sale_item_id"],
+                    "quantity": quantity
                 },
-
-                st.session_state.token
-
+                token=token
             )
 
             if response.status_code == 201:
-
-                st.success(
-                    "Return item added successfully."
-                )
-
+                st.success("Return item added successfully.")
                 st.rerun()
-
             else:
-
                 try:
                     error = response.json()["error"]
-                except:
+                except Exception:
                     error = response.text
-
                 st.error(error)
 
 
 # ==================================================
-# RETURN ITEMS
+# RETURN ITEMS LIST
 # ==================================================
 st.divider()
-
-st.subheader(
-    f"Returned Items ({len(return_items)})"
-)
+st.subheader(f"Returned Items ({len(return_items)})")
 
 if not return_items:
-
-    st.info(
-        "No returned items yet."
-    )
-
+    st.info("No returned items yet.")
 else:
-
     for item in return_items:
-
         medicine = medicine_map.get(
             item["medicine_id"],
             {}
         )
 
-        col1, col2, col3, col4, col5, col6 = (
-            st.columns([3, 1, 1, 1, 1, 1])
-        )
+        col1, col2, col3, col4, col5, col6 = st.columns([3, 1, 1, 1, 1, 1])
 
         with col1:
-
-            st.write(
-                medicine.get(
-                    "commercial_name",
-                    "Unknown Medicine"
-                )
-            )
-
-            st.caption(
-                medicine.get(
-                    "scientific_name",
-                    ""
-                )
-            )
+            st.write(medicine.get("commercial_name", "Unknown Medicine"))
+            st.caption(medicine.get("scientific_name", ""))
 
         with col2:
-
-            st.write(
-                f"{item['quantity']}"
-            )
+            st.write(f"{item['quantity']}")
 
         with col3:
-
-            st.write(
-                f"{float(item['unit_price']):.2f} JOD"
-            )
+            st.write(f"{float(item['unit_price']):.2f} JOD")
 
         with col4:
-
-            st.write(
-                f"{float(item['subtotal']):.2f} JOD"
-            )
+            st.write(f"{float(item['subtotal']):.2f} JOD")
 
         with col5:
-
-            st.write(
-                f"Batch #{item['batch_id']}"
-            )
+            st.write(f"Batch #{item['batch_id']}")
 
         with col6:
-
-            if not is_completed:
-
-                if st.button(
-                    "🗑️",
-                    key=f"delete_{item['return_item_id']}"
-                ):
-
+            if not is_completed and not is_cancelled:
+                if st.button("🗑️", key=f"delete_{item['return_item_id']}"):
                     response = delete(
                         f"/sales-return-items/{item['return_item_id']}",
-                        st.session_state.token
+                        token=token
                     )
-
                     if response.status_code == 200:
-
-                        st.success(
-                            "Return item deleted successfully."
-                        )
-
+                        st.success("Return item deleted successfully.")
                         st.rerun()
-
                     else:
-
                         try:
                             error = response.json()["error"]
-                        except:
+                        except Exception:
                             error = response.text
-
                         st.error(error)
 
         st.divider()
 
 
 # ==================================================
-# COMPLETE RETURN
+# COMPLETE OR CANCEL RETURN ACTIONS
 # ==================================================
-if not is_completed:
-
+if not is_completed and not is_cancelled:
     st.divider()
-
     if len(return_items) == 0:
-
-        st.warning(
-            "Add at least one return item before completing the return."
-        )
-
+        st.warning("Add at least one return item before completing the return.")
     else:
-
-        if st.button(
-            "✅ Complete Return",
-            type="primary",
-            use_container_width=True
-        ):
-
+        if st.button("✅ Complete Return", type="primary", use_container_width=True):
             response = post(
                 f"/sales-returns/{return_id}/complete",
                 {},
-                st.session_state.token
+                token=token
             )
-
             if response.status_code == 200:
-
-                st.success(
-                    "Sales Return completed successfully."
-                )
-
+                st.success("Sales Return completed successfully.")
                 st.rerun()
-
             else:
-
                 try:
                     error = response.json()["error"]
-                except:
+                except Exception:
                     error = response.text
-
                 st.error(error)
 
-else:
-
+elif is_completed:
     st.divider()
+    st.success("✅ This Sales Return has already been completed.")
 
-    st.success(
-        "✅ This Sales Return has already been completed."
-    )
+    # زر إلغاء المرتجع المكتمل مع عكس المخزون
+    if st.button("❌ Cancel Sales Return", type="secondary", use_container_width=True):
+        response = post(
+            f"/sales-returns/{return_id}/cancel",
+            {},
+            token=token
+        )
+        if response.status_code == 200:
+            st.success("Sales Return cancelled successfully and stock reversed.")
+            st.rerun()
+        else:
+            try:
+                error = response.json()["error"]
+            except Exception:
+                error = response.text
+            st.error(error)
+
+else:
+    st.divider()
+    st.warning("⚠️ This Sales Return is cancelled.")
     
 
 # ==================================================
 # BACK
 # ==================================================
-if st.button(
-    "⬅ Back to Returns",
-    use_container_width=True
-):
-
-    st.switch_page(
-        "pages/sales_return.py"
-    )
+if st.button("⬅ Back to Returns", use_container_width=True):
+    st.switch_page("pages/sales_return.py")

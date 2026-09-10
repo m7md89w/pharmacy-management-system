@@ -3,24 +3,47 @@ import streamlit as st
 from services.api_client import (
     get
 )
+from components.sidebar import render_sidebar
 
 st.set_page_config(
     page_title="Purchase Return History",
     page_icon="📜",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("📜 Purchase Return History")
 
 # ==================================================
 # AUTH
 # ==================================================
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
 
     st.warning(
         "Please login first."
     )
-
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if (
@@ -44,7 +67,7 @@ purchase_id = (
 # ==================================================
 response = get(
     f"/purchase-returns/purchase/{purchase_id}",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -147,5 +170,3 @@ if st.button(
     st.switch_page(
         "pages/purchase_returns.py"
     )
-
-

@@ -6,12 +6,32 @@ from services.api_client import (
     put,
     delete
 )
+from components.sidebar import render_sidebar
 
 st.set_page_config(
     page_title="Purchase Orders",
     page_icon="🧾",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# ==================================================
+# إخفاء القائمة الجانبية الافتراضية لملفات الصفحات في Streamlit
+# ==================================================
+st.markdown(
+    """
+    <style>
+        /* إخفاء قائمة التنقل التلقائية لأسماء الملفات في الشريط الجانبي */
+        [data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# عرض القائمة الجانبية المخصصة للمشروع
+render_sidebar()
 
 st.title("🧾 Purchase Orders")
 
@@ -19,8 +39,12 @@ st.title("🧾 Purchase Orders")
 # ==================================================
 # AUTH
 # ==================================================
-if "token" not in st.session_state:
+token = st.session_state.get("token") or st.session_state.get("access_token")
+
+if not token:
     st.warning("Please login first.")
+    if st.button("Go to Login / Main Page"):
+        st.switch_page("app.py")
     st.stop()
 
 if "selected_purchase" not in st.session_state:
@@ -32,7 +56,7 @@ if "selected_purchase" not in st.session_state:
 # ==================================================
 response = get(
     "/suppliers/",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -74,7 +98,7 @@ with st.expander("➕ Create Purchase Order"):
                 {
                     "supplier_id": supplier_id
                 },
-                st.session_state.token
+                token=token
             )
 
             if response.status_code == 201:
@@ -89,7 +113,7 @@ with st.expander("➕ Create Purchase Order"):
 
                 try:
                     error = response.json()["error"]
-                except:
+                except Exception:
                     error = response.text
 
                 st.error(error)
@@ -116,7 +140,7 @@ search = st.text_input(
 # ==================================================
 response = get(
     "/purchase-orders/",
-    st.session_state.token
+    token=token
 )
 
 if response.status_code != 200:
@@ -255,7 +279,7 @@ for order in orders:
                     {
                         "status": "RECEIVED"
                     },
-                    st.session_state.token
+                    token=token
                 )
 
                 if response.status_code == 200:
@@ -270,7 +294,7 @@ for order in orders:
 
                     try:
                         error = response.json()["error"]
-                    except:
+                    except Exception:
                         error = response.text
 
                     st.error(error)
@@ -289,7 +313,7 @@ for order in orders:
 
                 response = delete(
                     f"/purchase-orders/{order['purchase_id']}",
-                    st.session_state.token
+                    token=token
                 )
 
                 if response.status_code == 200:
@@ -304,7 +328,7 @@ for order in orders:
 
                     try:
                         error = response.json()["error"]
-                    except:
+                    except Exception:
                         error = response.text
 
                     st.error(error)

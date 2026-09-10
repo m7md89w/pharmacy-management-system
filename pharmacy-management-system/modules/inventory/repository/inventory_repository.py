@@ -1,6 +1,5 @@
-from sqlalchemy.orm import Session
-
-from models.all_models import Inventory
+from sqlalchemy.orm import Session, joinedload
+from models.all_models import Inventory, Medicine, MedicineBatch
 
 
 class InventoryRepository:
@@ -30,6 +29,9 @@ class InventoryRepository:
 
         return (
             self.db.query(Inventory)
+            .options(
+                joinedload(Inventory.medicine).joinedload(Medicine.batches)
+            )
             .filter(
                 Inventory.inventory_id == inventory_id
             )
@@ -43,6 +45,9 @@ class InventoryRepository:
 
         return (
             self.db.query(Inventory)
+            .options(
+                joinedload(Inventory.medicine).joinedload(Medicine.batches)
+            )
             .filter(
                 Inventory.medicine_id == medicine_id
             )
@@ -50,9 +55,23 @@ class InventoryRepository:
         )
 
     def get_all(self):
-
         return (
             self.db.query(Inventory)
+            .options(
+                joinedload(Inventory.medicine).joinedload(Medicine.batches)
+            )
+            .all()
+        )
+
+    def get_all_with_batches(self):
+        """
+        جلب كل سجلات المخزون مع تفاصيل الدواء ودفعاته
+        """
+        return (
+            self.db.query(Inventory)
+            .options(
+                joinedload(Inventory.medicine).joinedload(Medicine.batches)
+            )
             .all()
         )
 

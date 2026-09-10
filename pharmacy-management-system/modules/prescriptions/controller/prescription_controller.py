@@ -256,3 +256,29 @@ def delete_prescription(
 
     finally:
         db.close()
+
+@prescription_controller.route("/customer/<int:customer_id>", methods=["GET"])
+@auth_required
+def get_prescriptions_by_customer(customer_id):
+    db = SessionLocal()
+    try:
+        prescription_repo = PrescriptionRepository(db)
+        customer_repo = CustomerRepository(db)
+        service = PrescriptionService(prescription_repo, customer_repo)
+        
+        prescriptions = service.get_by_customer(customer_id)
+        
+        return jsonify([
+            {
+                "prescription_id": p.prescription_id,
+                "customer_id": p.customer_id,
+                "doctor_name": p.doctor_name,
+                "prescription_image": p.prescription_image,
+                "issue_date": str(p.issue_date) if p.issue_date else None,
+                "notes": p.notes
+            }
+            for p in prescriptions
+        ]), 200
+        
+    finally:
+        db.close()

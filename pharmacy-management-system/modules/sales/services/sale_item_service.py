@@ -137,14 +137,22 @@ class SaleItemService:
                 batch.quantity
             )
 
-            unit_price = Decimal(
-                str(
-                    data.get(
-                        "unit_price",
-                        batch.selling_price
-                    )
-                )
-            )
+            # ==========================================
+            # اعتماد سعر البيع من الباتش (أمر الشراء) حصراً
+            # ==========================================
+            raw_price = data.get("unit_price")
+            if raw_price is not None and str(raw_price).strip() != "":
+                unit_price = Decimal(str(raw_price))
+            else:
+                batch_selling_price = getattr(batch, "selling_price", None)
+                if batch_selling_price is not None:
+                    unit_price = Decimal(str(batch_selling_price))
+                else:
+                    # إذا لم يوجد سعر في الباتش، يُعتبر صفر أو يمكن منع الاعتماد على سعر الدواء العام
+                    unit_price = Decimal("0")
+
+            if unit_price < 0:
+                raise ValueError("Unit price cannot be negative")
 
             subtotal = (
                 Decimal(str(sell_quantity))
@@ -216,10 +224,9 @@ class SaleItemService:
                 f"Sold {quantity} units of medicine "
                 f"{medicine.medicine_id}"
         })
-
         return created_items
-    
-        # ==================================================
+
+    # ==================================================
     # GET ITEM
     # ==================================================
     def get_item(
@@ -271,9 +278,8 @@ class SaleItemService:
         raise ValueError(
             "Sale items cannot be edited. Delete and recreate the item."
         )
-    
 
-        # ==================================================
+    # ==================================================
     # DELETE
     # ==================================================
     def delete_item(
@@ -375,5 +381,3 @@ class SaleItemService:
         )
 
         return True
-    
-

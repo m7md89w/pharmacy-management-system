@@ -23,25 +23,21 @@ class DrugInteractionService:
         self,
         medicine_ids: list[int]
     ):
+        if not medicine_ids or len(medicine_ids) < 2:
+            return []
 
+        med_ids_set = set(medicine_ids)
+        all_interactions = self.interaction_repo.get_by_medicine_ids(list(med_ids_set))
+
+        seen_ids = set()
         interactions = []
-
-        for med1, med2 in combinations(
-            medicine_ids,
-            2
-        ):
-
-            interaction = (
-                self.interaction_repo.get_by_pair(
-                    med1,
-                    med2
-                )
-            )
-
-            if interaction:
-                interactions.append(
-                    interaction
-                )
+        for i in all_interactions:
+            if i.interaction_id not in seen_ids:
+                if (i.medicine_1_id in med_ids_set and 
+                        i.medicine_2_id in med_ids_set and 
+                        i.medicine_1_id != i.medicine_2_id):
+                    seen_ids.add(i.interaction_id)
+                    interactions.append(i)
 
         return interactions
 

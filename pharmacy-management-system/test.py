@@ -10,8 +10,8 @@ print("\n🚀 DRUG INTERACTIONS TEST\n")
 login = client.post(
     "/auth/login",
     json={
-        "username": "mohamed",
-        "password": "123456"
+        "username": "admin",
+        "password": "Admin@123456"
     }
 )
 

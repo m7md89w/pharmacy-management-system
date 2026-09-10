@@ -68,13 +68,10 @@ class SalesInvoiceService:
                     "Customer not found"
                 )
 
-        if not data.get(
-            "invoice_number"
-        ):
-
-            data["invoice_number"] = (
-                f"INV-{int(time.time())}"
-            )
+        if not data.get("invoice_number"):
+            import random
+            random_suffix = random.randint(1000, 9999)
+            data["invoice_number"] = f"INV-{int(time.time())}-{random_suffix}"
 
         existing = (
             self.invoice_repo.get_by_invoice_number(
@@ -265,9 +262,10 @@ class SalesInvoiceService:
                 "Invoice has no items"
             )
 
-        if invoice.total_amount <= 0:
+        # السماح بإتمام الفاتورة حتى لو كان إجماليها صفراً، ومنع القيم السالبة فقط
+        if invoice.total_amount < 0:
             raise ValueError(
-                "Invoice total must be greater than zero"
+                "Invoice total cannot be negative"
             )
 
         invoice.status = "COMPLETED"

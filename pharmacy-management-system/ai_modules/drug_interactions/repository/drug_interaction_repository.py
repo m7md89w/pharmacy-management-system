@@ -79,6 +79,16 @@ class DrugInteractionRepository:
             .all()
         )
 
+    def get_by_medicine_ids(self, medicine_ids: list[int]) -> list[DrugInteraction]:
+        return (
+            self.db.query(DrugInteraction)
+            .filter(
+                DrugInteraction.medicine_1_id.in_(medicine_ids),
+                DrugInteraction.medicine_2_id.in_(medicine_ids)
+            )
+            .all()
+        )
+
     def delete(
         self,
         interaction
