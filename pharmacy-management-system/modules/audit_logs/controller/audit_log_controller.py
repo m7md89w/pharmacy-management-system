@@ -180,3 +180,5 @@ def get_audit_log_detail(audit_id):
     return jsonify({"error": str(e)}), 500
   finally:
     db.close()
+
+    

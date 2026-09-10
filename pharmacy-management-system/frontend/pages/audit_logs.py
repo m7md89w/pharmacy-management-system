@@ -204,3 +204,5 @@ if response.status_code == 200:
     st.info("No audit logs recorded in the system yet.")
 else:
   st.error("Failed to load audit logs from backend.")
+
+  
