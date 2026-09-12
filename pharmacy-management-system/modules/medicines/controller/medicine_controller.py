@@ -1,6 +1,5 @@
-from flask import Blueprint, jsonify, request
-
 from database.session import SessionLocal
+from flask import Blueprint, jsonify, request
 from modules.auth.decorators.auth_required import auth_required
 from modules.auth.decorators.role_required import role_required
 from modules.medicines.repository.medicine_repository import MedicineRepository
@@ -21,7 +20,7 @@ def create_medicine():
     repo = MedicineRepository(db)
     service = MedicineService(repo)
 
-    data = request.get_json()
+    data = request.get_json() or {}
     medicine = service.create_medicine(data)
 
     return (
@@ -29,6 +28,7 @@ def create_medicine():
             "message": "Medicine created successfully",
             "id": medicine.medicine_id,
             "commercial_name": medicine.commercial_name,
+            "strength": medicine.strength,
             "barcode": medicine.barcode,
         }),
         201,
@@ -49,7 +49,7 @@ def create_medicine():
 
 
 # =========================================================
-# GET ALL MEDICINES (تحديث لإرسال الـ location)
+# GET ALL MEDICINES
 # =========================================================
 @medicine_controller.route("/", methods=["GET"])
 @auth_required
@@ -67,6 +67,7 @@ def get_medicines():
                 "id": m.medicine_id,
                 "scientific_name": m.scientific_name,
                 "commercial_name": m.commercial_name,
+                "strength": m.strength,  # إرسال التركيز ليظهر في القوائم والواجهة
                 "barcode": m.barcode,
                 "dosage_form": m.dosage_form,
                 "selling_price": float(m.selling_price)
@@ -86,7 +87,7 @@ def get_medicines():
 
 
 # =========================================================
-# GET MEDICINE BY ID (تحديث لإرسال الـ location)
+# GET MEDICINE BY ID
 # =========================================================
 @medicine_controller.route("/<int:medicine_id>", methods=["GET"])
 @auth_required
@@ -103,6 +104,7 @@ def get_medicine(medicine_id):
             "id": medicine.medicine_id,
             "scientific_name": medicine.scientific_name,
             "commercial_name": medicine.commercial_name,
+            "strength": medicine.strength,
             "barcode": medicine.barcode,
             "description": medicine.description,
             "dosage_form": medicine.dosage_form,
@@ -139,14 +141,16 @@ def update_medicine(medicine_id):
     service = MedicineService(repo)
 
     medicine = service.get_medicine(medicine_id)
-    data = request.get_json()
+    data = request.get_json() or {}
 
     updated = service.update_medicine(medicine, data)
 
     return (
-        jsonify(
-            {"message": "Medicine updated successfully", "id": updated.medicine_id}
-        ),
+        jsonify({
+            "message": "Medicine updated successfully",
+            "id": updated.medicine_id,
+            "strength": updated.strength,
+        }),
         200,
     )
 
@@ -183,6 +187,7 @@ def restore_medicine(barcode):
             "message": "Medicine restored successfully",
             "id": medicine.medicine_id,
             "commercial_name": medicine.commercial_name,
+            "strength": medicine.strength,
         }),
         200,
     )

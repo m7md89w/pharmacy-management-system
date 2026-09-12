@@ -1,18 +1,13 @@
-import streamlit as st
-
-from services.api_client import (
-    get,
-    post,
-    put,
-    delete
-)
 from components.sidebar import render_sidebar
+from services.api_client import delete, get, post, put
+import streamlit as st
+from datetime import date
 
 st.set_page_config(
     page_title="Sale Details",
     page_icon="💰",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # ==================================================
@@ -41,844 +36,382 @@ st.title("💰 Sale Details")
 token = st.session_state.get("token") or st.session_state.get("access_token")
 
 if not token:
-    st.warning("Please login first.")
-    if st.button("Go to Login / Main Page"):
-        st.switch_page("app.py")
-    st.stop()
+  st.warning("Please login first.")
+  if st.button("Go to Login / Main Page"):
+    st.switch_page("app.py")
+  st.stop()
 
 if (
     "selected_invoice" not in st.session_state
     or st.session_state.selected_invoice is None
 ):
-    st.error("No invoice selected.")
-    st.stop()
+  st.error("No invoice selected.")
+  st.stop()
 
 invoice_id = st.session_state.selected_invoice
 
 # ==================================================
 # LOAD INVOICE
 # ==================================================
-response = get(
-    f"/sales-invoices/{invoice_id}",
-    token=token
-)
+response = get(f"/sales-invoices/{invoice_id}", token=token)
 
 if response.status_code != 200:
-    st.error("Invoice not found.")
-    st.stop()
+  st.error("Invoice not found.")
+  st.stop()
 
 invoice = response.json()
 
 # ==================================================
 # LOAD CUSTOMERS
 # ==================================================
-response = get(
-    "/customers/",
-    token=token
-)
+response = get("/customers/", token=token)
 
+customers = []
 customer_map = {}
+customer_options = {"Walk-in Customer (None)": None}
 
 if response.status_code == 200:
-
-    customers = response.json()
-
-    customer_map = {
-        c["customer_id"]: c["full_name"]
-        for c in customers
-    }
+  customers = response.json()
+  for c in customers:
+    customer_map[c["customer_id"]] = c["full_name"]
+    customer_options[f"{c['full_name']} ({c.get('phone', 'No Phone')})"] = c[
+        "customer_id"
+    ]
 
 # ==================================================
 # LOAD MEDICINES
 # ==================================================
-response = get(
-    "/medicines/",
-    token=token
-)
+response = get("/medicines/", token=token)
 
 if response.status_code != 200:
-    st.error("Failed to load medicines.")
-    st.stop()
+  st.error("Failed to load medicines.")
+  st.stop()
 
 medicines = response.json()
 
 medicine_map = {
-    medicine["id"]: medicine["commercial_name"]
-    for medicine in medicines
+    medicine["id"]: medicine["commercial_name"] for medicine in medicines
 }
 
 medicine_options = {
-    medicine["commercial_name"]: medicine["id"]
-    for medicine in medicines
+    medicine["commercial_name"]: medicine["id"] for medicine in medicines
 }
 
 # ==================================================
 # LOAD SALE ITEMS
 # ==================================================
-response = get(
-    f"/sale-items/invoice/{invoice_id}",
-    token=token
-)
+response = get(f"/sale-items/invoice/{invoice_id}", token=token)
 
 if response.status_code != 200:
-
-    st.error(
-        "Failed to load sale items."
-    )
-
-    st.stop()
+  st.error("Failed to load sale items.")
+  st.stop()
 
 items = response.json()
-
 
 # ==================================================
 # LOAD RETURNS
 # ==================================================
-response = get(
-    f"/sales-returns/invoice/{invoice_id}",
-    token=token
-)
-
-sales_returns = []
-
-if response.status_code == 200:
-    sales_returns = response.json()
-
+response = get(f"/sales-returns/invoice/{invoice_id}", token=token)
+sales_returns = response.json() if response.status_code == 200 else []
 
 # ==================================================
 # LOAD RETURN ITEMS
 # ==================================================
-response = get(
-    f"/sales-return-items/invoice/{invoice_id}",
-    token=token
-)
-
-returned_items = []
-
-if response.status_code == 200:
-    returned_items = response.json()
-
+response = get(f"/sales-return-items/invoice/{invoice_id}", token=token)
+returned_items = response.json() if response.status_code == 200 else []
 
 # ==================================================
 # CALCULATE RETURNED QTY
 # ==================================================
 returned_map = {}
-
 for item in returned_items:
-
-    returned_map[item["sale_item_id"]] = (
-
-        returned_map.get(
-            item["sale_item_id"],
-            0
-        )
-
-        + item["quantity"]
-
-    )
-
+  returned_map[item["sale_item_id"]] = (
+      returned_map.get(item["sale_item_id"], 0) + item["quantity"]
+  )
 
 # ==================================================
-# HEADER
+# HEADER & CUSTOMER SELECTION (IF DRAFT)
 # ==================================================
 col1, col2 = st.columns(2)
 
 with col1:
+  st.subheader(f"Invoice #{invoice['invoice_number']}")
 
-    st.subheader(
-        f"Invoice #{invoice['invoice_number']}"
-    )
+  current_customer_id = invoice.get("customer_id")
 
-    customer_name = customer_map.get(
-        invoice["customer_id"],
-        "Walk-in Customer"
-    )
+  if invoice["status"] == "DRAFT":
+    inv_customer_keys = list(customer_options.keys())
+    current_selection_index = 0
+    for idx, (name, cid) in enumerate(customer_options.items()):
+      if cid == current_customer_id:
+        current_selection_index = idx
+        break
 
-    st.write(
-        f"Customer: {customer_name}"
+    selected_customer_label = st.selectbox(
+        "Assign / Change Customer",
+        inv_customer_keys,
+        index=current_selection_index,
     )
+    selected_customer_id = customer_options[selected_customer_label]
 
-    st.write(
-        f"Status: {invoice['status']}"
-    )
+    if selected_customer_id != current_customer_id:
+      update_res = put(
+          f"/sales-invoices/{invoice_id}",
+          {"customer_id": selected_customer_id},
+          token=token,
+      )
+      if update_res.status_code == 201 or update_res.status_code == 200:
+        st.success("Customer updated successfully.")
+        st.rerun()
+      else:
+        st.error("Failed to update customer.")
+  else:
+    customer_name = customer_map.get(current_customer_id, "Walk-in Customer")
+    st.write(f"Customer: {customer_name}")
+
+  st.write(f"Status: {invoice['status']}")
 
 with col2:
+  st.write(f"Total Amount: {invoice['total_amount']} JOD")
+  st.write(f"Payment Method: {invoice['payment_method']}")
+  if invoice.get("sale_date"):
+    st.write(f"Date: {invoice['sale_date']}")
 
-    st.write(
-        f"Total Amount: {invoice['total_amount']} JOD"
-    )
+# ==================================================
+# PRESCRIPTIONS INTEGRATION (IF CUSTOMER SELECTED & DRAFT)
+# ==================================================
+if invoice["status"] == "DRAFT" and invoice.get("customer_id"):
+  st.divider()
+  st.subheader("📋 Customer Prescriptions")
 
-    st.write(
-        f"Payment Method: {invoice['payment_method']}"
-    )
+  pres_res = get(
+      f"/prescriptions/customer/{invoice['customer_id']}", token=token
+  )
+  if pres_res.status_code == 200:
+    prescriptions = pres_res.json()
+    if not prescriptions:
+      st.info("No prescriptions found for this customer.")
+    else:
+      for pres in prescriptions:
+        with st.expander(
+            f"Prescription #{pres.get('prescription_id')} | Dr."
+            f" {pres.get('doctor_name', 'Unknown')} | Date:"
+            f" {pres.get('issue_date', 'N/A')}"
+        ):
+          st.write(f"**Notes:** {pres.get('notes', 'None')}")
 
-    if invoice.get("sale_date"):
+          items_res = get(
+              f"/prescription-items/prescription/{pres.get('prescription_id')}",
+              token=token,
+          )
+          pres_items = items_res.json() if items_res.status_code == 200 else []
 
-        st.write(
-            f"Date: {invoice['sale_date']}"
-        )
+          if pres_items:
+            st.write("Prescription Medicines:")
+            for pi in pres_items:
+              med_name = medicine_map.get(
+                  pi.get("medicine_id"), "Unknown Medicine"
+              )
+              st.caption(f"- {med_name} (Dosage: {pi.get('dosage', 'N/A')})")
 
+          if st.button(
+              f"📥 Add Prescription #{pres.get('prescription_id')} to Invoice",
+              key=f"import_pres_{pres.get('prescription_id')}",
+          ):
+            imported_count = 0
+            failed_count = 0
+
+            for p_item in pres_items:
+              med_id = p_item.get("medicine_id")
+              item_res = post(
+                  "/sale-items/",
+                  {
+                      "invoice_id": invoice_id,
+                      "medicine_id": med_id,
+                      "quantity": 1,
+                  },
+                  token=token,
+              )
+              if item_res.status_code == 201 or item_res.status_code == 200:
+                imported_count += 1
+              else:
+                failed_count += 1
+
+            if imported_count > 0:
+              st.success(
+                  f"Successfully added {imported_count} prescription items to"
+                  " draft invoice!"
+              )
+              if failed_count > 0:
+                st.warning(
+                    f"Could not add {failed_count} items due to lack of stock or"
+                    " expiry."
+                )
+              st.rerun()
+            else:
+              st.error(
+                  "Failed to add prescription items. Check available valid"
+                  " inventory stock."
+              )
+  else:
+    st.caption("Could not load customer prescriptions.")
 
 # ==================================================
 # BACK
 # ==================================================
-if st.button(
-    "⬅️ Back to Sales"
-):
-
-    st.session_state.selected_invoice = None
-
-    st.switch_page(
-        "pages/sales_invoices.py"
-    )
-
+st.divider()
+if st.button("⬅️ Back to Sales"):
+  st.session_state.selected_invoice = None
+  st.switch_page("pages/sales_invoices.py")
 
 # ==================================================
 # COMPLETE SALE
 # ==================================================
 if invoice["status"] == "DRAFT":
-
-    st.divider()
-
-    if st.button(
-        "✅ Complete Sale",
-        type="primary",
-        use_container_width=True
-    ):
-
-        if len(items) == 0:
-
-            st.error(
-                "Cannot complete an empty invoice."
-            )
-
-        else:
-
-            response = post(
-                f"/sales-invoices/{invoice_id}/complete",
-                {},
-                token=token
-            )
-
-            if response.status_code == 200:
-
-                st.success(
-                    "Sale completed successfully."
-                )
-
-                st.rerun()
-
-            else:
-
-                try:
-                    error = response.json()["error"]
-                except Exception:
-                    error = response.text
-
-                st.error(error)
-
+  st.divider()
+  if st.button(
+      "✅ Complete Sale (Deduct Stock)",
+      type="primary",
+      use_container_width=True,
+  ):
+    if len(items) == 0:
+      st.error("Cannot complete an empty invoice.")
+    else:
+      response = post(f"/sales-invoices/{invoice_id}/complete", {}, token=token)
+      if response.status_code == 200 or response.status_code == 201:
+        st.success(
+            "Sale completed successfully and inventory stock updated."
+        )
+        st.rerun()
+      else:
+        try:
+          error = response.json()["error"]
+        except Exception:
+          error = response.text
+        st.error(error)
 
 # ==================================================
-# ADD ITEM
+# ADD ITEM MANUALLY (FILTERING EXPIRED BATCHES)
 # ==================================================
 if invoice["status"] == "DRAFT":
+  st.divider()
+  st.subheader("➕ Add Sale Item Manually")
 
-    st.divider()
+  medicine_name = st.selectbox(
+      "Medicine", list(medicine_options.keys()), key="manual_med_select"
+  )
+  selected_medicine_id = medicine_options[medicine_name]
 
-    st.subheader(
-        "➕ Add Sale Item"
+  # جلب الدفعات وتصفية المنتهية منها (استبعاد التي تاريخ انتهائها أقل من تاريخ اليوم)
+  response = get(f"/batches/medicine/{selected_medicine_id}", token=token)
+  valid_batches = []
+  today = date.today()
+
+  if response.status_code == 200:
+    for batch in response.json():
+      if batch["quantity"] > 0 and batch.get("expiry_date"):
+        try:
+          # تحويل تاريخ انتهاء الصلاحية إلى كائن date للمقارنة
+          exp_date = date.fromisoformat(batch["expiry_date"])
+          if exp_date >= today:
+            valid_batches.append(batch)
+        except Exception:
+          # في حال وجود صيغة تاريخ غير متوقعة يتم تخطيها أماناً
+          continue
+
+  total_stock = sum(batch["quantity"] for batch in valid_batches)
+
+  if total_stock == 0:
+    st.warning(
+        "No valid (non-expired) stock available for this medicine."
     )
+  else:
+    st.success(f"Available Valid Stock : {total_stock}")
 
-    medicine_name = st.selectbox(
-        "Medicine",
-        list(medicine_options.keys())
-    )
-
-    selected_medicine_id = medicine_options[
-        medicine_name
-    ]
-
-    # ==========================================
-    # LOAD AVAILABLE BATCHES
-    # ==========================================
-    response = get(
-        f"/batches/medicine/{selected_medicine_id}",
-        token=token
-    )
-
-    available_batches = []
-
-    if response.status_code == 200:
-
-        available_batches = [
-
-            batch
-
-            for batch in response.json()
-
-            if batch["quantity"] > 0
-
-        ]
-
-    total_stock = sum(
-        batch["quantity"]
-        for batch in available_batches
-    )
-
-    if total_stock == 0:
-
-        st.warning(
-            "No stock available for this medicine."
+    # عرض تفاصيل الدفعات الصالحة فقط للمستخدم
+    with st.expander("📦 Valid Batches & Expiry Dates"):
+      for b in valid_batches:
+        st.write(
+            f"- **Batch Number:** {b.get('batch_number')} | **Valid Qty:**"
+            f" {b.get('quantity')} | **Expiry Date:**"
+            f" {b.get('expiry_date')} | **Price:** {b.get('selling_price')} JOD"
         )
 
-    else:
+    quantity = st.number_input(
+        "Quantity", min_value=1, max_value=total_stock, value=1, step=1
+    )
 
-        st.success(
-            f"Available Stock : {total_stock}"
-        )
+    if st.button("➕ Add Item to Invoice", type="primary"):
+      response = post(
+          "/sale-items/",
+          {
+              "invoice_id": invoice_id,
+              "medicine_id": selected_medicine_id,
+              "quantity": int(quantity),
+          },
+          token=token,
+      )
 
-        with st.expander(
-            "Available Batches"
-        ):
-
-            for batch in available_batches:
-
-                st.write(
-                    f"Batch : {batch['batch_number']}"
-                )
-
-                st.caption(
-                    f"Qty : {batch['quantity']} | "
-                    f"Expiry : {batch['expiry_date']} | "
-                    f"Price : {batch['selling_price']}"
-                )
-
-                st.divider()
-
-        quantity = st.number_input(
-            "Quantity",
-            min_value=1,
-            max_value=total_stock,
-            value=1,
-            step=1
-        )
-
-        if st.button(
-            "➕ Add Item",
-            type="primary"
-        ):
-
-            response = post(
-                "/sale-items/",
-                {
-                    "invoice_id": invoice_id,
-                    "medicine_id": selected_medicine_id,
-                    "quantity": int(quantity)
-                },
-                token=token
-            )
-
-            if response.status_code == 201:
-
-                st.success(
-                    "Sale item added successfully."
-                )
-
-                st.rerun()
-
-            else:
-
-                try:
-                    st.error(
-                        response.json()["error"]
-                    )
-                except Exception:
-
-                    st.error(
-                        response.text
-                    )
-
+      if response.status_code == 201 or response.status_code == 200:
+        st.success("Sale item added to invoice successfully.")
+        st.rerun()
+      else:
+        try:
+          st.error(response.json()["error"])
+        except Exception:
+          st.error(response.text)
 
 # ==================================================
-# SALE ITEMS
+# SALE ITEMS LIST
 # ==================================================
 st.divider()
-
-st.subheader(
-    f"Sale Items ({len(items)})"
-)
+st.subheader(f"Invoice Items ({len(items)})")
 
 if len(items) == 0:
-
-    st.info(
-        "No sale items."
-    )
-
+  st.info("No items in this invoice yet.")
 else:
-
-    for item in items:
-
-        returned_qty = returned_map.get(
-            item["sale_item_id"],
-            0
-        )
-
-        remaining_qty = (
-            item["quantity"]
-            - returned_qty
-        )
-
-        col1, col2, col3, col4, col5, col6 = st.columns(
-            [3, 2, 2, 2, 2, 1]
-        )
-
-        # ======================================
-        # MEDICINE
-        # ======================================
-        with col1:
-
-            st.write(
-
-                medicine_map.get(
-                    item["medicine_id"],
-                    "Unknown"
-                )
-
-            )
-
-            st.caption(
-                f"Batch ID : {item['batch_id']}"
-            )
-
-        # ======================================
-        # QUANTITY
-        # ======================================
-        with col2:
-
-            st.write(
-                f"Sold : {item['quantity']}"
-            )
-
-            if returned_qty > 0:
-
-                st.caption(
-                    f"Returned : {returned_qty}"
-                )
-
-                st.caption(
-                    f"Remaining : {remaining_qty}"
-                )
-
-        # ======================================
-        # UNIT PRICE
-        # ======================================
-        with col3:
-
-            st.write(
-                f"{item['unit_price']} JOD"
-            )
-
-        # ======================================
-        # SUBTOTAL
-        # ======================================
-        with col4:
-
-            st.write(
-                f"{item['subtotal']} JOD"
-            )
-
-        # ======================================
-        # STATUS
-        # ======================================
-        with col5:
-
-            if remaining_qty == 0:
-
-                st.success(
-                    "Returned"
-                )
-
-            elif returned_qty > 0:
-
-                st.warning(
-                    "Partially Returned"
-                )
-
-            else:
-
-                st.info(
-                    "Sold"
-                )
-
-        # ======================================
-        # DELETE
-        # ======================================
-        with col6:
-
-            if invoice["status"] == "DRAFT":
-
-                if st.button(
-                    "🗑️",
-                    key=f"delete_{item['sale_item_id']}"
-                ):
-
-                    response = delete(
-                        f"/sale-items/{item['sale_item_id']}",
-                        token=token
-                    )
-
-                    if response.status_code == 200:
-
-                        st.success(
-                            "Item deleted."
-                        )
-
-                        st.rerun()
-
-                    else:
-
-                        try:
-
-                            st.error(
-                                response.json()["error"]
-                            )
-
-                        except Exception:
-
-                            st.error(
-                                response.text
-                            )
-
-        st.divider()
-
-
-
-# ==================================================
-# SALES RETURNS
-# ==================================================
-st.divider()
-
-st.subheader("↩️ Sales Returns")
-
-if invoice["status"] == "COMPLETED":
-
-    completed_items = [
-
-        item
-
-        for item in items
-
-        if item["quantity"]
-        >
-        returned_map.get(
-            item["sale_item_id"],
-            0
-        )
-
-    ]
-
-    if len(completed_items) == 0:
-
-        st.success(
-            "All items have already been returned."
-        )
-
-    else:
-
-        sale_item = st.selectbox(
-
-            "Sale Item",
-
-            completed_items,
-
-            format_func=lambda x:
-            f"{medicine_map.get(x['medicine_id'],'Unknown')} "
-            f"(Qty {x['quantity'] - returned_map.get(x['sale_item_id'],0)})"
-
-        )
-
-        max_qty = (
-
-            sale_item["quantity"]
-
-            -
-
-            returned_map.get(
-                sale_item["sale_item_id"],
-                0
-            )
-
-        )
-
-        return_qty = st.number_input(
-
-            "Return Quantity",
-
-            min_value=1,
-
-            max_value=max_qty,
-
-            value=1
-
-        )
-
-        reason = st.text_input(
-            "Reason"
-        )
-
-        if st.button(
-            "↩️ Return Item",
-            type="primary"
-        ):
-
-            response = post(
-
-                "/sales-return-items/",
-
-                {
-
-                    "sale_item_id":
-                        sale_item["sale_item_id"],
-
-                    "quantity":
-                        int(return_qty),
-
-                    "reason":
-                        reason
-
-                },
-
-                token=token
-
-            )
-
-            if response.status_code == 201:
-
-                st.success(
-                    "Return completed successfully."
-                )
-
-                st.rerun()
-
-            else:
-
-                try:
-
-                    st.error(
-                        response.json()["error"]
-                    )
-
-                except Exception:
-
-                    st.error(
-                        response.text
-                    )
-
-
-# ==================================================
-# RETURNS HISTORY
-# ==================================================
-st.divider()
-
-st.subheader("📋 Returns History")
-
-if len(sales_returns) == 0:
-
-    st.info(
-        "No returns found."
-    )
-
-else:
-
-    for sale_return in sales_returns:
-
-        with st.expander(
-
-            f"Return #{sale_return['return_id']}"
-
-        ):
-
-            st.write(
-                f"Status : {sale_return['status']}"
-            )
-
-            st.write(
-                f"Total : {sale_return['total_amount']} JOD"
-            )
-
-            if sale_return.get(
-                "return_date"
-            ):
-
-                st.write(
-                    f"Date : {sale_return['return_date']}"
-                )
-
-            response = get(
-                f"/sales-return-items/return/{sale_return['return_id']}",
-                token=token
-            )
-
-            if response.status_code == 200:
-
-                return_items = response.json()
-
-                for item in return_items:
-
-                    medicine_name = medicine_map.get(
-                        item["medicine_id"],
-                        "Unknown"
-                    )
-
-                    st.markdown(
-                        f"""
-**{medicine_name}**
-
-- Quantity : {item['quantity']}
-- Unit Price : {item['unit_price']} JOD
-- Subtotal : {item['subtotal']} JOD
-- Reason : {item.get('reason','-')}
-"""
-                    )
-
-                    st.divider()
-
-
-# ==================================================
-# INVOICE SUMMARY
-# ==================================================
-st.divider()
-
-st.subheader("🧾 Invoice Summary")
-
-total_items = sum(
-    item["quantity"]
-    for item in items
-)
-
-returned_total = sum(
-    returned_map.values()
-)
-
-active_items = total_items - returned_total
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-
-    st.metric(
-        "Items Sold",
-        total_items
-    )
-
-with col2:
-
-    st.metric(
-        "Items Returned",
-        returned_total
-    )
-
-with col3:
-
-    st.metric(
-        "Active Items",
-        active_items
-    )
-
-st.divider()
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-    st.metric(
-        "Invoice Total",
-        f"{invoice['total_amount']} JOD"
-    )
-
-with col2:
-
-    st.metric(
-        "Status",
-        invoice["status"]
-    )
-
-
-# ==================================================
-# REFRESH
-# ==================================================
-if st.button(
-    "🔄 Refresh",
-    use_container_width=True
-):
-
-    st.rerun()
-
-
-# ==================================================
-# DELETE INVOICE
-# ==================================================
-if invoice["status"] == "DRAFT":
-
-    if st.button(
-        "🗑️ Delete Invoice",
-        use_container_width=True
-    ):
-
-        response = delete(
-            f"/sales-invoices/{invoice_id}",
-            token=token
-        )
-
-        if response.status_code == 200:
-
-            st.success(
-                "Invoice deleted successfully."
-            )
-
-            st.session_state.selected_invoice = None
-
-            st.switch_page(
-                "pages/sales_invoices.py"
-            )
-
-        else:
-
+  for item in items:
+    returned_qty = returned_map.get(item["sale_item_id"], 0)
+    remaining_qty = item["quantity"] - returned_qty
+
+    col1, col2, col3, col4, col5, col6 = st.columns([3, 2, 2, 2, 2, 1])
+
+    with col1:
+      st.write(
+          medicine_map.get(item["medicine_id"], "Unknown")
+      )
+      st.caption(f"Batch ID : {item['batch_id']}")
+
+    with col2:
+      st.write(f"Qty : {item['quantity']}")
+      if returned_qty > 0:
+        st.caption(f"Returned : {returned_qty}")
+        st.caption(f"Remaining : {remaining_qty}")
+
+    with col3:
+      st.write(f"{item['unit_price']} JOD")
+
+    with col4:
+      st.write(f"{item['subtotal']} JOD")
+
+    with col5:
+      if remaining_qty == 0:
+        st.success("Returned")
+      elif returned_qty > 0:
+        st.warning("Partially Returned")
+      else:
+        st.info("In Draft / Sold")
+
+    with col6:
+      if invoice["status"] == "DRAFT":
+        if st.button("🗑️", key=f"delete_{item['sale_item_id']}"):
+          response = delete(f"/sale-items/{item['sale_item_id']}", token=token)
+          if response.status_code == 200 or response.status_code == 201:
+            st.success("Item removed from invoice.")
+            st.rerun()
+          else:
             try:
-                st.error(
-                    response.json()["error"]
-                )
-
+              st.error(response.json()["error"])
             except Exception:
-
-                st.error(
-                    response.text
-                )
-
-
-# ==================================================
-# DEBUG (اختياري)
-# ==================================================
-with st.expander("🔍 Debug Information"):
-
-    st.write("Invoice")
-
-    st.json(invoice)
-
-    st.write("Sale Items")
-
-    st.json(items)
-
-    st.write("Returned Quantities")
-
-    st.json(returned_map)
-
-
-# ==================================================
-# FOOTER
-# ==================================================
-st.divider()
-
-st.caption(
-    "Pharmacy ERP • Sales Module"
-)
+              st.error(response.text)
+    st.divider()
