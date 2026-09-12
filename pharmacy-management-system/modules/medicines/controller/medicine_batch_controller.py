@@ -180,7 +180,7 @@ def get_batch(batch_id):
 
 
 # ==================================================
-# GET BY MEDICINE (AVAILABLE BATCHES ONLY)
+# GET BY MEDICINE (ALL BATCHES - FOR INVENTORY DETAILS)
 # ==================================================
 @medicine_batch_controller.route(
     "/medicine/<int:medicine_id>",
@@ -197,8 +197,8 @@ def get_batches_by_medicine(
 
         batch_repo = MedicineBatchRepository(db)
 
-        # استخدام دالة get_available_batches لضمان استبعاد الدفعات المنتهية والصفرية تلقائياً
-        batches = batch_repo.get_available_batches(medicine_id)
+        # جلب جميع الدفعات (الصالحة والمنتهية) لعرضها في صفحة تفاصيل المخزون
+        batches = batch_repo.get_by_medicine_id(medicine_id)
 
         return jsonify([
             {
