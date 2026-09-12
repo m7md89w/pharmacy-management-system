@@ -159,7 +159,7 @@ if response.status_code == 200:
       # في حال لم يتم توزيع الباتشات تاريخياً، نعتبر المتاح هو ما تبقى بعد استبعاد المنتهي أو الإجمالي
       if available_qty == 0 and expired_qty == 0 and total_qty > 0:
         available_qty = total_qty
-      elif available_qty + expired_qty != total_qty:
+      elif available_qty + expired_qty != total_qty:  # noqa: SIM102
         # ضمان اتساق الأرقام مع الإجمالي الكلي
         if total_qty > expired_qty:
           available_qty = total_qty - expired_qty

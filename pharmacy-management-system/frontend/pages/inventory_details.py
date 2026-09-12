@@ -1,7 +1,8 @@
 from datetime import datetime
+
+import pandas as pd
 import streamlit as st
 from components.sidebar import render_sidebar
-import pandas as pd
 from services.api_client import get
 
 st.set_page_config(
@@ -96,9 +97,7 @@ for b in batches:
   if batch_search and batch_search not in b_num:
     continue
 
-  if status_filter == "Valid" and is_expired:
-    continue
-  elif status_filter == "Expired / Damaged" and not is_expired:
+  if status_filter == "Valid" and is_expired or status_filter == "Expired / Damaged" and not is_expired:
     continue
 
   filtered_batches.append(b)

@@ -1,9 +1,10 @@
 import os
 
+import flask_cors
+from dotenv import load_dotenv
+
 # pyrefly: ignore [missing-import]
 from flask import Flask, jsonify
-from flask_cors import CORS
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -11,125 +12,95 @@ load_dotenv()
 # AUTH
 # ==========================
 
+from ai_modules.drug_interactions.controller.drug_interaction_controller import (
+    drug_interaction_controller,
+)
+from modules.audit_logs.controller.audit_log_controller import audit_log_controller
 from modules.auth.controller.auth_controller import auth_controller
-
-# ==========================
-# ROLES
-# ==========================
-
-from modules.roles.controller.role_controller import role_controller
-
-# ==========================
-# USERS
-# ==========================
-
-from modules.users.controller.user_controller import user_controller
-
-# ==========================
-# SUPPLIERS
-# ==========================
-
-from modules.suppliers.controller.supplier_controller import supplier_controller
+from modules.categories.controller.category_controller import category_controller
 
 # ==========================
 # CUSTOMERS
 # ==========================
-
 from modules.customers.controller.customer_controller import customer_controller
+from modules.expired_medicines.controller.expired_medicine_controller import (
+    expired_medicine_controller,
+)
+from modules.expired_medicines.controller.expired_medicine_item_controller import (
+    expired_medicine_item_controller,
+)
+from modules.inventory.controller.inventory_controller import inventory_controller
+from modules.manufacturers.controller.manufacturer_controller import (
+    manufacturer_controller,
+)
+from modules.medicines.controller.medicine_batch_controller import (
+    medicine_batch_controller,
+)
 
 # ==========================
 # MEDICINES
 # ==========================
-
 from modules.medicines.controller.medicine_controller import medicine_controller
-
-from modules.medicines.controller.medicine_batch_controller import (
-    medicine_batch_controller
+from modules.notifications.controller.notification_controller import (
+    notification_controller,
+)
+from modules.prescriptions.controller.prescription_controller import (
+    prescription_controller,
+)
+from modules.prescriptions.controller.prescription_item_controller import (
+    prescription_item_controller,
+)
+from modules.purchase_returns.controller.purchase_return_controller import (
+    purchase_return_controller,
+)
+from modules.purchase_returns.controller.purchase_return_item_controller import (
+    purchase_return_item_controller,
+)
+from modules.purchases.controller.purchase_item_controller import (
+    purchase_item_controller,
 )
 
 # ==========================
 # PURCHASES
 # ==========================
-
 from modules.purchases.controller.purchase_order_controller import (
-    purchase_order_controller
+    purchase_order_controller,
 )
+from modules.reports.controller.report_controller import report_controller
 
-from modules.purchases.controller.purchase_item_controller import (
-    purchase_item_controller
-)
+# ==========================
+# ROLES
+# ==========================
+from modules.roles.controller.role_controller import role_controller
+from modules.sales.controller.sale_item_controller import sale_item_controller
 
 # ==========================
 # SALES
 # ==========================
-
-from modules.sales.controller.sales_invoice_controller import (
-    sales_invoice_controller
+from modules.sales.controller.sales_invoice_controller import sales_invoice_controller
+from modules.sales_returns.controller.sales_return_controller import (
+    sales_return_controller,
 )
-
-from modules.sales.controller.sale_item_controller import (
-    sale_item_controller
+from modules.sales_returns.controller.sales_return_item_controller import (
+    sales_return_item_controller,
 )
 
 # ==========================
 # STOCK MOVEMENTS
 # ==========================
-
 from modules.stock_movements.controller.stock_movement_controller import (
-    stock_movement_controller
+    stock_movement_controller,
 )
 
-from modules.inventory.controller.inventory_controller import inventory_controller
+# ==========================
+# SUPPLIERS
+# ==========================
+from modules.suppliers.controller.supplier_controller import supplier_controller
 
-from modules.sales_returns.controller.sales_return_controller import (
-    sales_return_controller
-)
-from modules.sales_returns.controller.sales_return_item_controller import (
-    sales_return_item_controller
-)
-
-from modules.expired_medicines.controller.expired_medicine_controller import (
-    expired_medicine_controller
-)
-
-from modules.expired_medicines.controller.expired_medicine_item_controller import (
-    expired_medicine_item_controller
-)
-
-from modules.purchase_returns.controller.purchase_return_controller import (
-    purchase_return_controller
-)
-
-from modules.purchase_returns.controller.purchase_return_item_controller import (
-    purchase_return_item_controller
-)
-
-from modules.reports.controller.report_controller import report_controller
-
-from modules.audit_logs.controller.audit_log_controller import audit_log_controller
-
-from modules.categories.controller.category_controller import category_controller
-
-from modules.manufacturers.controller.manufacturer_controller import (
-    manufacturer_controller
-)
-
-from modules.prescriptions.controller.prescription_controller import (
-    prescription_controller
-)
-
-from modules.prescriptions.controller.prescription_item_controller import (
-    prescription_item_controller
-)
-
-from modules.notifications.controller.notification_controller import (
-    notification_controller
-)
-
-from ai_modules.drug_interactions.controller.drug_interaction_controller import (
-    drug_interaction_controller
-)
-
+# ==========================
+# USERS
+# ==========================
+from modules.users.controller.user_controller import user_controller
 
 # ==========================
 # APP FACTORY
@@ -139,7 +110,7 @@ app = Flask(__name__)
 
 # Restrict CORS to the Streamlit frontend origin only.
 # In production, replace with your actual domain.
-CORS(
+flask_cors.CORS(
     app,
     origins=[
         "http://localhost:8501",
@@ -214,7 +185,7 @@ def handle_unhandled_exception(error: Exception):
 
 if __name__ == "__main__":
     flask_debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5000))  # noqa: PLW1508
 
     app.run(
         host="0.0.0.0",
