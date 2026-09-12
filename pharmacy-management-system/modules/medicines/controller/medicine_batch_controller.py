@@ -194,7 +194,7 @@ def get_batch(batch_id):
 
 
 # ==================================================
-# GET BY MEDICINE
+# GET BY MEDICINE (AVAILABLE BATCHES ONLY)
 # ==================================================
 @medicine_batch_controller.route(
     "/medicine/<int:medicine_id>",
@@ -210,20 +210,9 @@ def get_batches_by_medicine(
     try:
 
         batch_repo = MedicineBatchRepository(db)
-        medicine_repo = MedicineRepository(db)
-        supplier_repo = SupplierRepository(db)
 
-        service = MedicineBatchService(
-            batch_repo,
-            medicine_repo,
-            supplier_repo
-        )
-
-        batches = (
-            service.get_batches_by_medicine(
-                medicine_id
-            )
-        )
+        # استخدام دالة get_available_batches لضمان استبعاد الدفعات المنتهية والصفرية تلقائياً
+        batches = batch_repo.get_available_batches(medicine_id)
 
         return jsonify([
             {
