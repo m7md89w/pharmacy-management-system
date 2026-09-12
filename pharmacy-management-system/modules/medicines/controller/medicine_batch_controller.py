@@ -1,27 +1,13 @@
-from flask import Blueprint, request, jsonify
-
 from database.session import SessionLocal
-
-from modules.medicines.repository.medicine_repository import (
-    MedicineRepository
-)
+from flask import Blueprint, jsonify, request
+from modules.auth.decorators.auth_required import auth_required
+from modules.auth.decorators.role_required import role_required
 from modules.medicines.repository.medicine_batch_repository import (
-    MedicineBatchRepository
+    MedicineBatchRepository,
 )
-from modules.medicines.services.medicine_batch_service import (
-    MedicineBatchService
-)
-
-from modules.suppliers.repository.supplier_repository import (
-    SupplierRepository
-)
-
-from modules.auth.decorators.auth_required import (
-    auth_required
-)
-from modules.auth.decorators.role_required import (
-    role_required
-)
+from modules.medicines.repository.medicine_repository import MedicineRepository
+from modules.medicines.services.medicine_batch_service import MedicineBatchService
+from modules.suppliers.repository.supplier_repository import SupplierRepository
 
 medicine_batch_controller = Blueprint(
     "medicine_batches",
@@ -75,7 +61,7 @@ def create_batch():
             "error": str(e)
         }), 400
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
 
         return jsonify({
             "error": "Internal Server Error",

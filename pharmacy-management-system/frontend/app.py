@@ -1,8 +1,8 @@
 import streamlit as st
+from components.sidebar import render_sidebar
 
 # استيراد المكونات ودوال المصادقة
-from services.auth import login_user, is_authenticated
-from components.sidebar import render_sidebar
+from services.auth import is_authenticated, login_user
 
 # ==================================================
 # PAGE CONFIGURATION
@@ -33,7 +33,7 @@ def login_page():
         unsafe_allow_html=True,
     )
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    _col1, col2, _col3 = st.columns([1, 2, 1])
 
     with col2:
         st.title("💊 Pharmacy ERP")

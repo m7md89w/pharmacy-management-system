@@ -1,6 +1,7 @@
 from datetime import date
-from sqlalchemy.orm import Session
+
 from models.all_models import MedicineBatch
+from sqlalchemy.orm import Session
 
 
 class MedicineBatchRepository:
@@ -54,7 +55,7 @@ class MedicineBatchRepository:
             .filter(
                 MedicineBatch.medicine_id == medicine_id,
                 MedicineBatch.quantity > 0,
-                MedicineBatch.expiry_date > date.today()
+                MedicineBatch.expiry_date > date.today()  # noqa: DTZ011
             )
             .order_by(
                 MedicineBatch.expiry_date.asc(),
