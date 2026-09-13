@@ -151,6 +151,9 @@ if response.status_code != 200:
 
 orders = response.json()
 
+# ترتيب أوامر الشراء تنازلياً بحيث يظهر الطلب الأحدث (الأعلى ID) في أعلى القائمة
+orders = sorted(orders, key=lambda x: x.get("purchase_id", 0), reverse=True)
+
 # ==================================================
 # FILTER
 # ==================================================

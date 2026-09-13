@@ -1,7 +1,7 @@
 from components.sidebar import render_sidebar
+from datetime import date
 from services.api_client import delete, get, post, put
 import streamlit as st
-from datetime import date
 
 st.set_page_config(
     page_title="Sale Details",
@@ -89,13 +89,18 @@ if response.status_code != 200:
 
 medicines = response.json()
 
-medicine_map = {
-    medicine["id"]: medicine["commercial_name"] for medicine in medicines
-}
+medicine_map = {}
+medicine_options = {}
 
-medicine_options = {
-    medicine["commercial_name"]: medicine["id"] for medicine in medicines
-}
+for medicine in medicines:
+  med_id = medicine["id"]
+  com_name = medicine["commercial_name"]
+  strength_val = medicine.get("strength")
+  display_name = (
+      f"{com_name} ({strength_val})" if strength_val else com_name
+  )
+  medicine_map[med_id] = display_name
+  medicine_options[display_name] = med_id
 
 # ==================================================
 # LOAD SALE ITEMS
@@ -130,7 +135,7 @@ for item in returned_items:
   )
 
 # ==================================================
-# HEADER & CUSTOMER SELECTION (IF DRAFT)
+# HEADER & CUSTOMER / PAYMENT METHOD SELECTION (IF DRAFT)
 # ==================================================
 col1, col2 = st.columns(2)
 
@@ -138,8 +143,10 @@ with col1:
   st.subheader(f"Invoice #{invoice['invoice_number']}")
 
   current_customer_id = invoice.get("customer_id")
+  current_payment_method = invoice.get("payment_method", "CASH")
 
   if invoice["status"] == "DRAFT":
+    # 1. Customer Selection (مباشرة وبدون زر حفظ)
     inv_customer_keys = list(customer_options.keys())
     current_selection_index = 0
     for idx, (name, cid) in enumerate(customer_options.items()):
@@ -160,20 +167,51 @@ with col1:
           {"customer_id": selected_customer_id},
           token=token,
       )
-      if update_res.status_code == 201 or update_res.status_code == 200:
+      if update_res.status_code == 200 or update_res.status_code == 201:
         st.success("Customer updated successfully.")
         st.rerun()
       else:
-        st.error("Failed to update customer.")
+        try:
+          err = update_res.json().get("error", update_res.text)
+        except Exception:
+          err = update_res.text
+        st.error(err)
+
+    # 2. Payment Method Selection (مباشرة وبدون زر حفظ)
+    payment_methods = ["CASH", "CARD", "INSURANCE", "OTHER"]
+    current_pay_index = (
+        payment_methods.index(current_payment_method)
+        if current_payment_method in payment_methods
+        else 0
+    )
+    selected_payment_method = st.selectbox(
+        "Payment Method", payment_methods, index=current_pay_index
+    )
+
+    if selected_payment_method != current_payment_method:
+      update_res = put(
+          f"/sales-invoices/{invoice_id}",
+          {"payment_method": selected_payment_method},
+          token=token,
+      )
+      if update_res.status_code == 200 or update_res.status_code == 201:
+        st.success("Payment method updated successfully.")
+        st.rerun()
+      else:
+        try:
+          err = update_res.json().get("error", update_res.text)
+        except Exception:
+          err = update_res.text
+        st.error(err)
   else:
     customer_name = customer_map.get(current_customer_id, "Walk-in Customer")
     st.write(f"Customer: {customer_name}")
+    st.write(f"Payment Method: {current_payment_method}")
 
   st.write(f"Status: {invoice['status']}")
 
 with col2:
   st.write(f"Total Amount: {invoice['total_amount']} JOD")
-  st.write(f"Payment Method: {invoice['payment_method']}")
   if invoice.get("sale_date"):
     st.write(f"Date: {invoice['sale_date']}")
 
@@ -212,7 +250,7 @@ if invoice["status"] == "DRAFT" and invoice.get("customer_id"):
               med_name = medicine_map.get(
                   pi.get("medicine_id"), "Unknown Medicine"
               )
-              st.caption(f"- {med_name} (Dosage: {pi.get('dosage', 'N/A')})")
+              st.caption(f"- {med_name}")
 
           if st.button(
               f"📥 Add Prescription #{pres.get('prescription_id')} to Invoice",
@@ -302,7 +340,7 @@ if invoice["status"] == "DRAFT":
   )
   selected_medicine_id = medicine_options[medicine_name]
 
-  # جلب الدفعات وتصفية المنتهية منها (استبعاد التي تاريخ انتهائها أقل من تاريخ اليوم)
+  # جلب الدفعات وتصفية المنتهية منها
   response = get(f"/batches/medicine/{selected_medicine_id}", token=token)
   valid_batches = []
   today = date.today()
@@ -311,12 +349,10 @@ if invoice["status"] == "DRAFT":
     for batch in response.json():
       if batch["quantity"] > 0 and batch.get("expiry_date"):
         try:
-          # تحويل تاريخ انتهاء الصلاحية إلى كائن date للمقارنة
           exp_date = date.fromisoformat(batch["expiry_date"])
           if exp_date >= today:
             valid_batches.append(batch)
         except Exception:
-          # في حال وجود صيغة تاريخ غير متوقعة يتم تخطيها أماناً
           continue
 
   total_stock = sum(batch["quantity"] for batch in valid_batches)
@@ -328,7 +364,6 @@ if invoice["status"] == "DRAFT":
   else:
     st.success(f"Available Valid Stock : {total_stock}")
 
-    # عرض تفاصيل الدفعات الصالحة فقط للمستخدم
     with st.expander("📦 Valid Batches & Expiry Dates"):
       for b in valid_batches:
         st.write(
