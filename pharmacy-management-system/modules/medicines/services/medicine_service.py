@@ -40,7 +40,7 @@ class MedicineService:
     location = data.pop("location", None)
     min_stock_level = data.pop("min_stock_level", 0)
 
-    # 1. إنشاء الدواء في جدول medicines (مع دعم حقل strength)
+    # 1. إنشاء الدواء في جدول medicines
     new_medicine = self.repo.create(data)
 
     # 2. إنشاء سجل المخزون المرتبط تلقائياً لتخزين مكان التخزين والكمية الابتدائية
@@ -121,7 +121,6 @@ class MedicineService:
         "scientific_name",
         "commercial_name",
         "barcode",
-        "strength",  # دعم حقل التركيز والجرعة للتحديث
         "description",
         "dosage_form",
         "requires_prescription",

@@ -81,9 +81,6 @@ with st.expander("➕ Add New Medicine"):
   with col1:
     scientific_name = st.text_input("Scientific Name", key="create_sci")
     commercial_name = st.text_input("Commercial Name", key="create_com")
-    strength = st.text_input(
-        "Strength / Dosage (e.g., 50mg, 10)", key="create_strength"
-    )
     barcode = st.text_input("Barcode", key="create_bar")
     location = st.text_input(
         "Storage Location (e.g., Shelf A-1)", key="create_loc"
@@ -149,7 +146,6 @@ with st.expander("➕ Add New Medicine"):
       data = {
           "scientific_name": scientific_name.strip(),
           "commercial_name": commercial_name.strip(),
-          "strength": strength.strip() if strength else "",
           "barcode": barcode.strip(),
           "dosage_form": dosage_form,
           "selling_price": float(price),
@@ -222,11 +218,6 @@ if st.session_state.edit_medicine:
       value=medicine.get("commercial_name", ""),
       key="edit_commercial",
   )
-  strength = st.text_input(
-      "Strength / Dosage",
-      value=medicine.get("strength", ""),
-      key="edit_strength",
-  )
   barcode = st.text_input(
       "Barcode", value=medicine.get("barcode", ""), key="edit_barcode"
   )
@@ -252,6 +243,7 @@ if st.session_state.edit_medicine:
       key="edit_dosage",
   )
 
+  # تحديد التصنيف الحالي للدواء افتراضياً
   current_cat_id = medicine.get("category_id")
   current_cat_name = next(
       (name for name, cid in categories_map.items() if cid == current_cat_id),
@@ -269,6 +261,7 @@ if st.session_state.edit_medicine:
       key="edit_category_select",
   )
 
+  # تحديد الشركة المصنعة الحالية للدواء افتراضياً
   current_man_id = medicine.get("manufacturer_id")
   current_man_name = next(
       (name for name, mid in manufacturers_map.items() if mid == current_man_id),
@@ -303,7 +296,6 @@ if st.session_state.edit_medicine:
       data = {
           "scientific_name": scientific_name,
           "commercial_name": commercial_name,
-          "strength": strength,
           "barcode": barcode,
           "dosage_form": dosage_form,
           "selling_price": selling_price,
@@ -353,7 +345,6 @@ if response.status_code == 200:
         if query in str(medicine["commercial_name"]).lower()
         or query in str(medicine["scientific_name"]).lower()
         or query in str(medicine["barcode"]).lower()
-        or query in str(medicine.get("strength", "")).lower()
     ]
 
   st.subheader(f"Medicines ({len(medicines)})")
@@ -363,8 +354,7 @@ if response.status_code == 200:
       col1, col2, col3, col4, col5 = st.columns([5, 2, 2, 1, 1])
 
       with col1:
-        str_val = f" ({medicine['strength']})" if medicine.get("strength") else ""
-        st.write(f"💊 **{medicine['commercial_name']}{str_val}**")
+        st.write(f"💊 **{medicine['commercial_name']}**")
         st.caption(medicine["scientific_name"])
         if medicine.get("location"):
           st.caption(f"📍 Location: {medicine['location']}")
@@ -377,6 +367,7 @@ if response.status_code == 200:
 
       with col4:
         if st.button("✏️", key=f"edit_{medicine['id']}"):
+          # جلب البيانات الكاملة للدواء (بما فيها manufacturer_id) لضمان ظهورها بدقة عند التعديل
           detail_res = get(f"/medicines/{medicine['id']}", token)
           if detail_res.status_code == 200:
             st.session_state.edit_medicine = detail_res.json()

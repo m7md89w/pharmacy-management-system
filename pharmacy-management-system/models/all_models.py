@@ -118,60 +118,49 @@ Index('idx_suppliers_is_active', Supplier.is_active)
 # 6. MEDICINES
 # =========================================================
 class Medicine(Base):
-  __tablename__ = "medicines"
+    __tablename__ = 'medicines'
 
-  medicine_id = Column(Integer, primary_key=True, autoincrement=True)
-  scientific_name = Column(String(150), nullable=False)
-  commercial_name = Column(String(150), nullable=False)
-  barcode = Column(String(50), nullable=False, unique=True)
+    medicine_id = Column(Integer, primary_key=True, autoincrement=True)
+    scientific_name = Column(String(150), nullable=False)
+    commercial_name = Column(String(150), nullable=False)
+    barcode = Column(String(50), nullable=False, unique=True)
 
-  # حقل التركيز أو الجرعة (مثال: 50mg, 10mg, 50000 IU) للتمييز بين الأصناف
-  strength = Column(String(50), nullable=True)
+    # NEW
+    rxcui = Column(String(50), unique=True)
 
-  rxcui = Column(String(50), unique=True)
-  description = Column(Text)
-  dosage_form = Column(String(50))
-  requires_prescription = Column(Boolean, nullable=False, default=False)
-  category_id = Column(
-      Integer,
-      ForeignKey(
-          "categories.category_id", onupdate="CASCADE", ondelete="SET NULL"
-      ),
-  )
-  manufacturer_id = Column(
-      Integer,
-      ForeignKey(
-          "manufacturers.manufacturer_id",
-          onupdate="CASCADE",
-          ondelete="SET NULL",
-      ),
-  )
-  selling_price = Column(Numeric(10, 2), nullable=False)
-  is_active = Column(Boolean, nullable=False, default=True)
-  created_at = Column(DateTime, nullable=False, server_default=func.now())
-  updated_at = Column(
-      DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
-  )
+    description = Column(Text)
+    dosage_form = Column(String(50))
+    requires_prescription = Column(Boolean, nullable=False, default=False)
+    category_id = Column(Integer, ForeignKey('categories.category_id', onupdate='CASCADE', ondelete='SET NULL'))
+    manufacturer_id = Column(Integer, ForeignKey('manufacturers.manufacturer_id', onupdate='CASCADE', ondelete='SET NULL'))
+    selling_price = Column(Numeric(10, 2), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
-  __table_args__ = (
-      CheckConstraint(
-          "selling_price >= 0", name="ck_medicines_selling_price"
-      ),
-      CheckConstraint(
-          "dosage_form IS NULL OR dosage_form IN"
-          " ('TABLET','CAPSULE','SYRUP','INJECTION','OINTMENT','DROPS','CREAM','POWDER','OTHER')",
-          name="ck_medicines_dosage_form",
-      ),
-  )
+    __table_args__ = (
+        CheckConstraint(
+            'selling_price >= 0',
+            name='ck_medicines_selling_price'
+        ),
+        CheckConstraint(
+            "dosage_form IS NULL OR dosage_form IN ('TABLET','CAPSULE','SYRUP','INJECTION','OINTMENT','DROPS','CREAM','POWDER','OTHER')",
+            name='ck_medicines_dosage_form'
+        ),
+    )
 
-  category = relationship("Category", back_populates="medicines")
-  manufacturer = relationship("Manufacturer", back_populates="medicines")
-  batches = relationship("MedicineBatch", back_populates="medicine")
-  inventory = relationship("Inventory", back_populates="medicine", uselist=False)
-  purchase_items = relationship("PurchaseItem", back_populates="medicine")
-  sale_items = relationship("SaleItem", back_populates="medicine")
-  notifications = relationship("Notification", back_populates="medicine")
-  prescription_items = relationship("PrescriptionItem", back_populates="medicine")
+    category = relationship("Category", back_populates="medicines")
+    manufacturer = relationship("Manufacturer", back_populates="medicines")
+    batches = relationship("MedicineBatch", back_populates="medicine")
+    inventory = relationship("Inventory", back_populates="medicine", uselist=False)
+    purchase_items = relationship("PurchaseItem", back_populates="medicine")
+    sale_items = relationship("SaleItem", back_populates="medicine")
+    notifications = relationship("Notification", back_populates="medicine")
+    prescription_items = relationship("PrescriptionItem", back_populates="medicine")
+
+  
+
+Index('idx_medicines_rxcui', Medicine.rxcui)
 # =========================================================
 # 7. MEDICINE_BATCHES
 # =========================================================
