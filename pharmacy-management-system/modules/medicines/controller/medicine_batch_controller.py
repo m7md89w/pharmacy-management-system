@@ -23,11 +23,8 @@ medicine_batch_controller = Blueprint(
 @auth_required
 @role_required([1, 2])
 def create_batch():
-
     db = SessionLocal()
-
     try:
-
         batch_repo = MedicineBatchRepository(db)
         medicine_repo = MedicineRepository(db)
         supplier_repo = SupplierRepository(db)
@@ -40,10 +37,7 @@ def create_batch():
 
         data = request.get_json() or {}
 
-        if (
-            "supplier_id" not in data
-            or data["supplier_id"] is None
-        ):
+        if "supplier_id" not in data or data["supplier_id"] is None:
             data["supplier_id"] = 1
 
         batch = service.create_batch(data)
@@ -56,13 +50,9 @@ def create_batch():
         }), 201
 
     except ValueError as e:
-
-        return jsonify({
-            "error": str(e)
-        }), 400
+        return jsonify({"error": str(e)}), 400
 
     except Exception as e:  # noqa: BLE001
-
         return jsonify({
             "error": "Internal Server Error",
             "details": str(e)
@@ -78,11 +68,8 @@ def create_batch():
 @medicine_batch_controller.route("/", methods=["GET"])
 @auth_required
 def get_batches():
-
     db = SessionLocal()
-
     try:
-
         batch_repo = MedicineBatchRepository(db)
         medicine_repo = MedicineRepository(db)
         supplier_repo = SupplierRepository(db)
@@ -102,15 +89,10 @@ def get_batches():
                 "supplier_id": batch.supplier_id,
                 "batch_number": batch.batch_number,
                 "quantity": batch.quantity,
-                "purchase_price": float(
-                    batch.purchase_price
-                ),
-                "selling_price": float(
-                    batch.selling_price
-                ),
-                "expiry_date": str(
-                    batch.expiry_date
-                )
+                "purchase_price": float(batch.purchase_price),
+                "selling_price": float(batch.selling_price),
+                "manufacture_date": str(batch.manufacture_date) if batch.manufacture_date else None,
+                "expiry_date": str(batch.expiry_date)
             }
             for batch in batches
         ])
@@ -122,17 +104,11 @@ def get_batches():
 # ==================================================
 # GET BY ID
 # ==================================================
-@medicine_batch_controller.route(
-    "/<int:batch_id>",
-    methods=["GET"]
-)
+@medicine_batch_controller.route("/<int:batch_id>", methods=["GET"])
 @auth_required
 def get_batch(batch_id):
-
     db = SessionLocal()
-
     try:
-
         batch_repo = MedicineBatchRepository(db)
         medicine_repo = MedicineRepository(db)
         supplier_repo = SupplierRepository(db)
@@ -151,29 +127,15 @@ def get_batch(batch_id):
             "supplier_id": batch.supplier_id,
             "batch_number": batch.batch_number,
             "quantity": batch.quantity,
-            "purchase_price": float(
-                batch.purchase_price
-            ),
-            "selling_price": float(
-                batch.selling_price
-            ),
-            "manufacture_date":
-                str(batch.manufacture_date)
-                if batch.manufacture_date
-                else None,
-            "expiry_date": str(
-                batch.expiry_date
-            ),
-            "created_at": str(
-                batch.created_at
-            )
+            "purchase_price": float(batch.purchase_price),
+            "selling_price": float(batch.selling_price),
+            "manufacture_date": str(batch.manufacture_date) if batch.manufacture_date else None,
+            "expiry_date": str(batch.expiry_date),
+            "created_at": str(batch.created_at)
         })
 
     except ValueError as e:
-
-        return jsonify({
-            "error": str(e)
-        }), 404
+        return jsonify({"error": str(e)}), 404
 
     finally:
         db.close()
@@ -182,22 +144,12 @@ def get_batch(batch_id):
 # ==================================================
 # GET BY MEDICINE (ALL BATCHES - FOR INVENTORY DETAILS)
 # ==================================================
-@medicine_batch_controller.route(
-    "/medicine/<int:medicine_id>",
-    methods=["GET"]
-)
+@medicine_batch_controller.route("/medicine/<int:medicine_id>", methods=["GET"])
 @auth_required
-def get_batches_by_medicine(
-    medicine_id
-):
-
+def get_batches_by_medicine(medicine_id):
     db = SessionLocal()
-
     try:
-
         batch_repo = MedicineBatchRepository(db)
-
-        # جلب جميع الدفعات (الصالحة والمنتهية) لعرضها في صفحة تفاصيل المخزون
         batches = batch_repo.get_by_medicine_id(medicine_id)
 
         return jsonify([
@@ -207,15 +159,10 @@ def get_batches_by_medicine(
                 "supplier_id": batch.supplier_id,
                 "batch_number": batch.batch_number,
                 "quantity": batch.quantity,
-                "purchase_price": float(
-                    batch.purchase_price
-                ),
-                "selling_price": float(
-                    batch.selling_price
-                ),
-                "expiry_date": str(
-                    batch.expiry_date
-                )
+                "purchase_price": float(batch.purchase_price),
+                "selling_price": float(batch.selling_price),
+                "manufacture_date": str(batch.manufacture_date) if batch.manufacture_date else None,
+                "expiry_date": str(batch.expiry_date)
             }
             for batch in batches
         ])
@@ -227,18 +174,12 @@ def get_batches_by_medicine(
 # ==================================================
 # UPDATE
 # ==================================================
-@medicine_batch_controller.route(
-    "/<int:batch_id>",
-    methods=["PUT"]
-)
+@medicine_batch_controller.route("/<int:batch_id>", methods=["PUT"])
 @auth_required
 @role_required([1, 2])
 def update_batch(batch_id):
-
     db = SessionLocal()
-
     try:
-
         batch_repo = MedicineBatchRepository(db)
         medicine_repo = MedicineRepository(db)
         supplier_repo = SupplierRepository(db)
@@ -249,31 +190,17 @@ def update_batch(batch_id):
             supplier_repo
         )
 
-        batch = service.get_batch(
-            batch_id
-        )
-
+        batch = service.get_batch(batch_id)
         data = request.get_json()
-
-        updated_batch = (
-            service.update_batch(
-                batch,
-                data
-            )
-        )
+        updated_batch = service.update_batch(batch, data)
 
         return jsonify({
-            "message":
-                "Batch updated successfully",
-            "batch_id":
-                updated_batch.batch_id
+            "message": "Batch updated successfully",
+            "batch_id": updated_batch.batch_id
         })
 
     except ValueError as e:
-
-        return jsonify({
-            "error": str(e)
-        }), 400
+        return jsonify({"error": str(e)}), 400
 
     finally:
         db.close()
@@ -282,18 +209,12 @@ def update_batch(batch_id):
 # ==================================================
 # DELETE
 # ==================================================
-@medicine_batch_controller.route(
-    "/<int:batch_id>",
-    methods=["DELETE"]
-)
+@medicine_batch_controller.route("/<int:batch_id>", methods=["DELETE"])
 @auth_required
 @role_required([1])
 def delete_batch(batch_id):
-
     db = SessionLocal()
-
     try:
-
         batch_repo = MedicineBatchRepository(db)
         medicine_repo = MedicineRepository(db)
         supplier_repo = SupplierRepository(db)
@@ -304,24 +225,13 @@ def delete_batch(batch_id):
             supplier_repo
         )
 
-        batch = service.get_batch(
-            batch_id
-        )
+        batch = service.get_batch(batch_id)
+        service.delete_batch(batch)
 
-        service.delete_batch(
-            batch
-        )
-
-        return jsonify({
-            "message":
-                "Batch deleted successfully"
-        })
+        return jsonify({"message": "Batch deleted successfully"})
 
     except ValueError as e:
-
-        return jsonify({
-            "error": str(e)
-        }), 404
+        return jsonify({"error": str(e)}), 404
 
     finally:
         db.close()
