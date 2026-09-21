@@ -9,9 +9,15 @@ from flask import Flask, jsonify
 load_dotenv()
 
 # ==========================
+# CHATBOT (AI MODULE)
+# ==========================
+from ai_modules.chatbot.controllers.chatbot_controller import (
+    chatbot_bp,
+)
+
+# ==========================
 # AUTH
 # ==========================
-
 from ai_modules.drug_interactions.controller.drug_interaction_controller import (
     drug_interaction_controller,
 )
@@ -123,6 +129,7 @@ flask_cors.CORS(
 # REGISTER BLUEPRINTS
 # ==========================
 
+app.register_blueprint(chatbot_bp)  # تسجيل مسار الشات بوت الذكي
 app.register_blueprint(auth_controller)
 app.register_blueprint(role_controller)
 app.register_blueprint(user_controller)
