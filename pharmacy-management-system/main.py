@@ -12,9 +12,6 @@ load_dotenv()
 # AUTH
 # ==========================
 
-from ai_modules.drug_interactions.controller.drug_interaction_controller import (
-    drug_interaction_controller,
-)
 from modules.audit_logs.controller.audit_log_controller import audit_log_controller
 from modules.auth.controller.auth_controller import auth_controller
 from modules.categories.controller.category_controller import category_controller
@@ -102,6 +99,11 @@ from modules.suppliers.controller.supplier_controller import supplier_controller
 # ==========================
 from modules.users.controller.user_controller import user_controller
 
+# استدعاء Drug Interactions (AI)
+from ai_modules.drug_interactions.controller.drug_interaction_controller import (
+    drug_interaction_controller,
+)
+
 # ==========================
 # APP FACTORY
 # ==========================
@@ -149,8 +151,9 @@ app.register_blueprint(manufacturer_controller)
 app.register_blueprint(prescription_controller)
 app.register_blueprint(prescription_item_controller)
 app.register_blueprint(notification_controller)
-app.register_blueprint(drug_interaction_controller)
 
+# تسجيل مسار Drug Interactions (AI)
+app.register_blueprint(drug_interaction_controller)
 
 # ==========================
 # ROUTES
