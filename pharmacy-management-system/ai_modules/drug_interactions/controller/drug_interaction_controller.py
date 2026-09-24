@@ -12,18 +12,11 @@ drug_interaction_controller = Blueprint(
 service = DrugInteractionService()
 logger = logging.getLogger(__name__)
 
-# حد أقصى لعدد الأدوية بالطلب الواحد. الخدمة تعمل O(n) نداء شبكي متوازي لكل
-# دواء إضافي (RxNorm + openFDA)، فبدون حد أعلى أي طلب كبير ممكن يبطّئ
-# الاستجابة لدرجة تتجاوز مهلة الفرونت‌إند، أو يحمّل السيرفر بعدد threads كبير.
 MAX_DRUGS_PER_REQUEST = 15
 
 
 @drug_interaction_controller.route("/check", methods=["POST"])
 def check_interactions():
-    """
-    استقبال طلب فحص التداخلات الدوائية عبر واجهة برمجة التطبيقات،
-    والتحقق المبدئي من البيانات قبل تمريرها لطبقة الـ Service.
-    """
     data = request.get_json(silent=True)
 
     if not data:
@@ -49,11 +42,8 @@ def check_interactions():
         }), 400
 
     try:
-        # استدعاء منطق الأعمال من طبقة الـ Service
         result = service.process_interactions(current_drugs, new_drugs)
         return jsonify(result), 200
     except Exception:
-        # نسجّل تفاصيل الخطأ الكاملة بالـ log للتشخيص الداخلي، ونرجّع
-        # للعميل رسالة عامة فقط بدون تفاصيل الاستثناء الخام.
         logger.exception("Unexpected error while checking drug interactions")
         return jsonify({"error": "An unexpected error occurred while checking interactions."}), 500
