@@ -128,9 +128,11 @@ if res.status_code == 200:
                             if interactions:
                                 st.error(f"🚨 تحذير خطير: تم اكتشاف {len(interactions)} تداخل دوائي محتمل بين أدوية هذه الروشتة!")
                                 for inter in interactions:
-                                    with st.expander(f"⚠️ تعارض: {inter['drug1']} ↔️ {inter['drug2']}", expanded=True):
-                                        st.markdown(f"**التفاصيل:** {inter['description']}")
-                                        st.caption(f"📄 المصدر: {inter.get('source', 'openFDA')}")
+                                    # عرض تفصيلي واضح ومنظم لكل تعارض
+                                    with st.expander(f"⚠️ تعارض خطير بين: {inter['drug1']} ↔️ {inter['drug2']}", expanded=True):
+                                        st.markdown(f"🔬 **الآلية والتفاصيل العلمية:**\n{inter['description']}")
+                                        st.markdown("---")
+                                        st.markdown(f"📄 **المصدر الطبي المعتمد:** {inter.get('source', 'openFDA')}")
                                         st.warning(f"💡 **نوع التعارض:** {inter.get('relation_label')}")
                             else:
                                 st.success("✅ لم يتم العثور على أي تداخل دوائي صريح بين أدوية هذه الروشتة.")
